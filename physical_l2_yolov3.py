@@ -427,7 +427,7 @@ class Daedalus:
 				# check if we should abort search if we're getting nowhere.
 				if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
 					if l > prev * .9999:
-						breaks
+						break
 					prev = l
 				# update the best result found so far
 				for e, (l1, l2, ii) in enumerate(zip(l1s, l2s, nimgs)):
