@@ -30,7 +30,7 @@ import time
 GPU_ID = 1							# which gpu to used
 CONFIDENCE = 0.3					# the confidence of attack
 EXAMPLE_NUM = 2					# total number of adversarial example to generate.
-BATCH_SIZE = 1						# number of adversarial example generated in each batch
+BATCH_SIZE = 2						# number of adversarial example generated in each batch
 
 BINARY_SEARCH_STEPS = 5     		# number of times to adjust the constsant with binary search
 INITIAL_consts = 1e1	        	# the initial constsant c to pick as a first guess
@@ -332,22 +332,22 @@ class Daedalus:
 
 			# Optimisation metrics:
 			self.l2dist = tf.reduce_sum(tf.square(self.newimgs - (tf.tanh(self.timgs) * self.boxmul + self.boxplus)), [1, 2, 3])
-
+			print('self.l2dist', self.l2dist)
 			# Define DDoS losses: loss must be a tensor here!
 			# Make the objectness of all detections to be 1.
-			self.loss1_1_x = tf.reduce_mean(tf.square(self.box_scores - 1), [-2, -1])
-
+			self.loss1_1_x = tf.reduce_mean(tf.square(self.box_scores - 1), [-3, -2, -1])
+			print('self.loss1_1_x', self.loss1_1_x)
 			# Minimising the size of all bounding box.
 			#self.f1 = tf.reduce_mean(IoU_expts)
-			self.f3 = tf.reduce_mean(tf.square(tf.multiply(self.bw, self.bh)), [-2, -1])
-			#self.f2 = self.f3 + 1/output_to_pdist(self.bx, self.by)
+			self.f3 = tf.reduce_mean(tf.square(tf.multiply(self.bw, self.bh)), [-3, -2, -1])
+			print('self.f3', self.f3)
 
 			# add two loss terms together
 			self.loss_adv = self.loss1_1_x + self.f3
 			self.loss1 = tf.reduce_mean(self.consts * self.loss_adv)
 			self.loss2 = tf.reduce_mean(self.l2dist)
 			self.loss = self.loss1 + self.loss2
-
+			print(self.loss_adv, self.loss1, self.loss2, self.loss)
 		# Setup the adam optimizer and keep track of variables we're creating
 		start_vars = set(x.name for x in tf.global_variables())
 		optimizer = tf.train.AdamOptimizer(self.LEARNING_RATE)
@@ -426,11 +426,11 @@ class Daedalus:
 				# check if we should abort search if we're getting nowhere.
 				if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
 					if l > prev * .9999:
-						break
+						breaks
 					prev = l
-
 				# update the best result found so far
 				for e, (l1, l2, ii) in enumerate(zip(l1s, l2s, nimgs)):
+					print(l2, bestl2[e], l1, init_adv_losses[e])
 					if l2 < bestl2[e] and check_success(l1, init_adv_losses[e]):
 						bestl2[e] = l2
 						bestloss[e] = l1
@@ -500,8 +500,8 @@ if __name__ == '__main__':
 				EXAMPLE_NUM -= 1
 				if EXAMPLE_NUM == 0:
 					break
-	X_test = np.concatenate(X_test, axis=0)[10:]
-	print(X_test.shape)
+	X_test = np.concatenate(X_test, axis=0)
+	print('X_test shape:', X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
 	X_adv, distortions = attacker.attack(X_test)
 	writer = tf.summary.FileWriter("log", sess.graph)
