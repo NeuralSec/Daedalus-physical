@@ -29,6 +29,7 @@ from tqdm import tqdm
 
 # Parameter settings:
 GPU_ID = 1							# which gpu to used
+EOT_NUM = 10
 CONFIDENCE = 0.3					# the confidence of attack
 EXAMPLE_NUM = 2					# total number of adversarial example to generate.
 BATCH_SIZE = 2						# number of adversarial example generated in each batch
@@ -244,7 +245,7 @@ class Daedalus:
 	"""
 	Daedalus adversarial example generator based on the Yolo v3 model.
 	"""
-	def __init__(self, sess, model, img_shape=IMAGE_SHAPE, batch_size=BATCH_SIZE, confidence=CONFIDENCE,
+	def __init__(self, sess, model, img_shape=IMAGE_SHAPE, batch_size=BATCH_SIZE, confidence=CONFIDENCE, du_num=EOT_NUM
 				 learning_rate=LEARNING_RATE, binary_search_steps=BINARY_SEARCH_STEPS, max_iterations=MAX_ITERATIONS,
 				 abort_early=ABORT_EARLY, initial_consts=INITIAL_consts, boxmin=0, boxmax=1):
 		self.sess = sess
@@ -254,6 +255,7 @@ class Daedalus:
 		self.ABORT_EARLY = abort_early
 		self.initial_consts = initial_consts
 		self.batch_size = batch_size
+		self.du_num = du_num
 		self.repeat = binary_search_steps >= 6
 		self.yolo_model = model
 		self.confidence = confidence
@@ -270,29 +272,29 @@ class Daedalus:
 				msk = img
 				return msk
 
-		def transformations(perturbs, du_num=10):
+		def transformations(perturbs):
 			'''
 			Arguments:
 				# perturbs: perturbation tensors in shape (B, X, X, C).
-				# du_num: number of image duplications for transformations.
+				# self.du_num: number of image duplications for transformations.
 			Return:
 				# perturbs: the transformed images tensors.
 			'''
 			with tf.name_scope('transformations'):
 				W = tf.shape(perturbs)[-2]
 				C = tf.shape(perturbs)[-1]
-				perturbs = tf.concat([perturbs]*du_num, axis=0) 
-				angles = np.pi * tf.random.uniform(du_num, -0.15, 0.15)
+				perturbs = tf.concat([perturbs]*self.du_num, axis=0) 
+				angles = np.pi * tf.random.uniform(self.du_num, -0.15, 0.15)
 				perturbs = tf.contrib.image.rotate(perturbs, angles, interpolation='NEAREST', name='rotated_imgs')
-				perturbs = tf.reshape(tf.stack([perturbs]*du_num), [-1, W, W, C])
+				perturbs = tf.reshape(tf.stack([perturbs]*self.du_num), [-1, W, W, C])
 				perturbs = tf.image.random_brightness(perturbs, 0.1)
-				return tf.clip_by_value(perturbs, 0, 1) #(du_num**2, B, W, W, C)
+				return tf.clip_by_value(perturbs, 0, 1) #(self.du_num**2, B, W, W, C)
 
 		def NPS(imgs):
 			return
 
 		# the perturbation we're going to optimize:
-		with tf.name_scope('calc_loss'):
+		with tf.name_scope('inputs'):
 			perturbations = tf.Variable(np.zeros((batch_size,
 												  img_shape[0],
 												  img_shape[1],
@@ -316,9 +318,12 @@ class Daedalus:
 			self.boxmul = (boxmax - boxmin) / 2.
 			self.boxplus = (boxmin + boxmax) / 2.
 			self.newimgs = tf.tanh(perturbations + self.timgs) * self.boxmul + self.boxplus
+			
+			transformed_perturbs = transformations(perturbations)
+			eot_imgs = tf.tanh(transformed_perturbs + self.timgs) * self.boxmul + self.boxplus
 
 			# Get prediction from the model:
-			outs = self.yolo_model._yolo(self.newimgs)
+			outs = self.yolo_model._yolo(eot_imgs)
 			# [(N, 13, 13, 3, 85), (N, 26, 26, 3, 85), (N, 52, 52, 3, 85)]
 			print(outs)
 			# (N, 3549, 3, 4), (N, 3549, 3, 1), (N, 3549, 3, 80)
@@ -331,6 +336,7 @@ class Daedalus:
 			self.class_probs = classprobs
 			self.box_scores = tf.multiply(self.obj_scores, tf.reduce_max(self.class_probs, axis=-1, keepdims=True))
 
+		with tf.name_scope('calc_loss'):
 			# Optimisation metrics:
 			self.l2dist = tf.reduce_sum(tf.square(self.newimgs - (tf.tanh(self.timgs) * self.boxmul + self.boxplus)), [1, 2, 3])
 			print('self.l2dist', self.l2dist)
