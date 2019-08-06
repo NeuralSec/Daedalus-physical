@@ -25,6 +25,7 @@ import cv2
 import matplotlib.pyplot as plt
 from skimage import io
 import time
+from tqdm import tqdm
 
 # Parameter settings:
 GPU_ID = 1							# which gpu to used
@@ -412,7 +413,7 @@ class Daedalus:
 			init_loss = sess.run(self.loss)
 			init_adv_losses = sess.run(self.loss_adv)
 			prev = init_loss * 1.1
-			for iteration in range(self.MAX_ITERATIONS):
+			for iteration in tqdm(range(self.MAX_ITERATIONS)):
 				# perform the attack on a single example
 				_, l, l2s, l1s, nimgs, c = self.sess.run([self.train, self.loss, self.l2dist, self.loss_adv, self.newimgs, self.consts])
 				# print out the losses every 10%
