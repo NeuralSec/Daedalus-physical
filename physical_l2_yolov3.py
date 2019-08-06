@@ -31,8 +31,8 @@ GPU_ID = 1							# which gpu to used
 ATTACK_MODE = 'all'				# select attack mode from 'all', 'most', 'least' and 'single';
 ATTACK_CLASS = None				# select the class to attack in 'single' mode
 CONFIDENCE = 0.2					# the confidence of attack
-EXAMPLE_NUM = 100					# total number of adversarial example to generate.
-BATCH_SIZE = 10						# number of adversarial example generated in each batch
+EXAMPLE_NUM = 1					# total number of adversarial example to generate.
+BATCH_SIZE = 1						# number of adversarial example generated in each batch
 
 BINARY_SEARCH_STEPS = 5     		# number of times to adjust the constsant with binary search
 INITIAL_consts = 1e1	        	# the initial constsant c to pick as a first guess
@@ -304,8 +304,9 @@ class Daedalus:
 			Return:
 				# msk: a tensor mask
 			"""
-			msk = img
-			return msk
+			with tf.name_scope('generate_mask'):
+				msk = img
+				return msk
 
 		def transformations(perturbs, du_num=10):
 			'''
@@ -315,76 +316,78 @@ class Daedalus:
 			Return:
 				# perturbs: the transformed images tensors.
 			'''
-			W = tf.shape(perturbs)[-2]
-			C = tf.shape(perturbs)[-1]
-			perturbs = tf.concat([perturbs]*du_num, axis=0) 
-			angles = np.pi * tf.random.uniform(du_num, -0.15, 0.15)
-			perturbs = tf.contrib.image.rotate(perturbs, angles, interpolation='NEAREST', name='rotated_imgs')
-			perturbs = tf.reshape(tf.stack([perturbs]*du_num), [-1, W, W, C])
-			perturbs = tf.image.random_brightness(perturbs, 0.1)
-			return tf.clip_by_value(perturbs, 0, 1) #(du_num**2, B, W, W, C)
+			with tf.name_scope('transformations'):
+				W = tf.shape(perturbs)[-2]
+				C = tf.shape(perturbs)[-1]
+				perturbs = tf.concat([perturbs]*du_num, axis=0) 
+				angles = np.pi * tf.random.uniform(du_num, -0.15, 0.15)
+				perturbs = tf.contrib.image.rotate(perturbs, angles, interpolation='NEAREST', name='rotated_imgs')
+				perturbs = tf.reshape(tf.stack([perturbs]*du_num), [-1, W, W, C])
+				perturbs = tf.image.random_brightness(perturbs, 0.1)
+				return tf.clip_by_value(perturbs, 0, 1) #(du_num**2, B, W, W, C)
 
 		def NPS(imgs):
 			return
 
 		# the perturbation we're going to optimize:
-		perturbations = tf.Variable(np.zeros((batch_size,
-											  img_shape[0],
-											  img_shape[1],
-											  img_shape[2])), dtype=tf.float32, name='perturbations')
-		# tf variables to sending data to tf:
-		self.timgs = tf.Variable(np.zeros((batch_size,
-										   img_shape[0],
-										   img_shape[1],
-										   img_shape[2])), dtype=tf.float32, name='self.timgs')
-		self.consts = tf.Variable(np.zeros(batch_size), dtype=tf.float32, name='self.consts')
+		with tf.name_scope('calc_loss'):
+			perturbations = tf.Variable(np.zeros((batch_size,
+												  img_shape[0],
+												  img_shape[1],
+												  img_shape[2])), dtype=tf.float32, name='perturbations')
+			# tf variables to sending data to tf:
+			self.timgs = tf.Variable(np.zeros((batch_size,
+											   img_shape[0],
+											   img_shape[1],
+											   img_shape[2])), dtype=tf.float32, name='self.timgs')
+			self.consts = tf.Variable(np.zeros(batch_size), dtype=tf.float32, name='self.consts')
 
-		# and here's what we use to assign them:
-		self.assign_timgs = tf.placeholder(tf.float32, (batch_size,
-														img_shape[0],
-														img_shape[1],
-														img_shape[2]))
-		self.assign_consts = tf.placeholder(tf.float32, [batch_size])
+			# and here's what we use to assign them:
+			self.assign_timgs = tf.placeholder(tf.float32, (batch_size,
+															img_shape[0],
+															img_shape[1],
+															img_shape[2]))
+			self.assign_consts = tf.placeholder(tf.float32, [batch_size])
 
-		# Tensor operation: the resulting image, tanh'd to keep bounded from
-		# boxmin to boxmax:
-		self.boxmul = (boxmax - boxmin) / 2.
-		self.boxplus = (boxmin + boxmax) / 2.
-		self.newimgs = tf.tanh(perturbations + self.timgs) * self.boxmul + self.boxplus
+			# Tensor operation: the resulting image, tanh'd to keep bounded from
+			# boxmin to boxmax:
+			self.boxmul = (boxmax - boxmin) / 2.
+			self.boxplus = (boxmin + boxmax) / 2.
+			self.newimgs = tf.tanh(perturbations + self.timgs) * self.boxmul + self.boxplus
 
-		# Get prediction from the model:
-		outs = self.yolo_model._yolo(self.newimgs)
-		# [(N, 13, 13, 3, 85), (N, 26, 26, 3, 85), (N, 52, 52, 3, 85)]
-		print(outs)
-		# (N, 3549, 3, 4), (N, 3549, 3, 1), (N, 3549, 3, 80)
-		boxes, objectness, classprobs = process_output(outs)
-		boxes, objectness, classprobs = select_class(self.target_class, boxes, objectness, classprobs, mode=self.attack_mode)
-		print(boxes, objectness, classprobs)
-		self.bx = boxes[..., 0:1]
-		self.by = boxes[..., 1:2]
-		self.bw = boxes[..., 2:3]
-		self.bh = boxes[..., 3:4]
-		self.obj_scores = objectness
-		self.class_probs = classprobs
-		self.box_scores = tf.multiply(self.obj_scores, tf.reduce_max(self.class_probs, axis=-1, keepdims=True))
+			# Get prediction from the model:
+			outs = self.yolo_model._yolo(self.newimgs)
+			# [(N, 13, 13, 3, 85), (N, 26, 26, 3, 85), (N, 52, 52, 3, 85)]
+			print(outs)
+			# (N, 3549, 3, 4), (N, 3549, 3, 1), (N, 3549, 3, 80)
+			boxes, objectness, classprobs = process_output(outs)
+			boxes, objectness, classprobs = select_class(self.target_class, boxes, objectness, classprobs, mode=self.attack_mode)
+			print(boxes, objectness, classprobs)
+			self.bx = boxes[..., 0:1]
+			self.by = boxes[..., 1:2]
+			self.bw = boxes[..., 2:3]
+			self.bh = boxes[..., 3:4]
+			self.obj_scores = objectness
+			self.class_probs = classprobs
+			self.box_scores = tf.multiply(self.obj_scores, tf.reduce_max(self.class_probs, axis=-1, keepdims=True))
 
-		# Optimisation metrics:
-		self.l2dist = tf.reduce_sum(tf.square(self.newimgs - (tf.tanh(self.timgs) * self.boxmul + self.boxplus)), [1, 2, 3])
+			# Optimisation metrics:
+			self.l2dist = tf.reduce_sum(tf.square(self.newimgs - (tf.tanh(self.timgs) * self.boxmul + self.boxplus)), [1, 2, 3])
 
-		# Define DDoS losses: loss must be a tensor here!
-		# Make the objectness of all detections to be 1.
-		self.loss1_1_x = tf.reduce_mean(tf.square(self.box_scores - 1), [-2, -1])
+			# Define DDoS losses: loss must be a tensor here!
+			# Make the objectness of all detections to be 1.
+			self.loss1_1_x = tf.reduce_mean(tf.square(self.box_scores - 1), [-2, -1])
 
-		# Minimising the size of all bounding box.
-		#self.f1 = tf.reduce_mean(IoU_expts)
-		self.f3 = tf.reduce_mean(tf.square(tf.multiply(self.bw, self.bh)), [-2, -1])
-		#self.f2 = self.f3 + 1/output_to_pdist(self.bx, self.by)
+			# Minimising the size of all bounding box.
+			#self.f1 = tf.reduce_mean(IoU_expts)
+			self.f3 = tf.reduce_mean(tf.square(tf.multiply(self.bw, self.bh)), [-2, -1])
+			#self.f2 = self.f3 + 1/output_to_pdist(self.bx, self.by)
 
-		# add two loss terms together
-		self.loss_adv = self.loss1_1_x + self.f3
-		self.loss1 = tf.reduce_mean(self.consts * self.loss_adv)
-		self.loss2 = tf.reduce_mean(self.l2dist)
-		self.loss = self.loss1 + self.loss2
+			# add two loss terms together
+			self.loss_adv = self.loss1_1_x + self.f3
+			self.loss1 = tf.reduce_mean(self.consts * self.loss_adv)
+			self.loss2 = tf.reduce_mean(self.l2dist)
+			self.loss = self.loss1 + self.loss2
 
 		# Setup the adam optimizer and keep track of variables we're creating
 		start_vars = set(x.name for x in tf.global_variables())
