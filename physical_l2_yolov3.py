@@ -243,9 +243,9 @@ class Daedalus:
 	"""
 	Daedalus adversarial example generator based on the Yolo v3 model.
 	"""
-	def __init__(self, sess, model, target_class=ATTACK_CLASS, attack_mode=ATTACK_MODE, img_shape=IMAGE_SHAPE,
-				 batch_size=BATCH_SIZE, confidence=CONFIDENCE, learning_rate=LEARNING_RATE, binary_search_steps=BINARY_SEARCH_STEPS,
-				 max_iterations=MAX_ITERATIONS, abort_early=ABORT_EARLY, initial_consts=INITIAL_consts, boxmin=0, boxmax=1):
+	def __init__(self, sess, model, img_shape=IMAGE_SHAPE, batch_size=BATCH_SIZE, confidence=CONFIDENCE,
+				 learning_rate=LEARNING_RATE, binary_search_steps=BINARY_SEARCH_STEPS, max_iterations=MAX_ITERATIONS,
+				 abort_early=ABORT_EARLY, initial_consts=INITIAL_consts, boxmin=0, boxmax=1):
 		self.sess = sess
 		self.LEARNING_RATE = learning_rate
 		self.MAX_ITERATIONS = max_iterations
@@ -256,8 +256,6 @@ class Daedalus:
 		self.repeat = binary_search_steps >= 6
 		self.yolo_model = model
 		self.confidence = confidence
-		self.target_class = target_class
-		self.attack_mode = attack_mode
 
 		def mask(img):
 			"""
