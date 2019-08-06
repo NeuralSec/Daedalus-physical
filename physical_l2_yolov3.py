@@ -28,7 +28,7 @@ import time
 
 # Parameter settings:
 GPU_ID = 1							# which gpu to used
-CONFIDENCE = 0.2					# the confidence of attack
+CONFIDENCE = 0.3					# the confidence of attack
 EXAMPLE_NUM = 1					# total number of adversarial example to generate.
 BATCH_SIZE = 1						# number of adversarial example generated in each batch
 
@@ -505,6 +505,5 @@ if __name__ == '__main__':
 	print(X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
 	X_adv, distortions = attacker.attack(X_test)
-	np.savez(SAVE_PATH+'{0} confidence/Daedalus example batch.npz'.format(CONFIDENCE), X_adv=X_adv, distortions=distortions)
 	writer = tf.summary.FileWriter("log", sess.graph)
 	writer.close()
