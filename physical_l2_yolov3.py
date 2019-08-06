@@ -29,6 +29,7 @@ import time
 # Parameter settings:
 GPU_ID = 1							# which gpu to used
 CONFIDENCE = 0.3					# the confidence of attack
+EXAMPLE_NUM = 2					# total number of adversarial example to generate.
 BATCH_SIZE = 1						# number of adversarial example generated in each batch
 
 BINARY_SEARCH_STEPS = 5     		# number of times to adjust the constsant with binary search
@@ -496,6 +497,9 @@ if __name__ == '__main__':
 				image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # RGB
 				image = process_image(image)
 				X_test.append(image)
+				EXAMPLE_NUM -= 1
+				if EXAMPLE_NUM == 0:
+					break
 	X_test = np.concatenate(X_test, axis=0)[10:]
 	print(X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
