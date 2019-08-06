@@ -28,8 +28,6 @@ import time
 
 # Parameter settings:
 GPU_ID = 1							# which gpu to used
-ATTACK_MODE = 'all'				# select attack mode from 'all', 'most', 'least' and 'single';
-ATTACK_CLASS = None				# select the class to attack in 'single' mode
 CONFIDENCE = 0.2					# the confidence of attack
 EXAMPLE_NUM = 1					# total number of adversarial example to generate.
 BATCH_SIZE = 1						# number of adversarial example generated in each batch
@@ -261,41 +259,6 @@ class Daedalus:
 		self.target_class = target_class
 		self.attack_mode = attack_mode
 
-		def select_class(target_class, boxes, objectness, box_scores, mode='all'):
-			box_classes = tf.cast(tf.argmax(box_scores, axis=-1), tf.int32, name='box_classes')
-			class_counts = tf.bincount(box_classes)
-			print(class_counts)
-			if mode == 'all':
-				selected_boxes = tf.reshape(boxes, [BATCH_SIZE, -1, 4])
-				selected_scores = tf.reshape(box_scores, [BATCH_SIZE, -1, CLASS_NUM])
-				if objectness == None:
-					return selected_boxes, None, selected_scores
-				selected_objectness = tf.reshape(objectness, [BATCH_SIZE, -1, 1])
-				return selected_boxes, selected_objectness, selected_scores
-			elif mode == 'most':
-				selected_cls = tf.argmax(class_counts)
-			elif mode == 'least':
-				class_counts = tf.where(tf.equal(class_counts,0), int(1e6)*tf.ones_like(class_counts, dtype=tf.int32), class_counts)
-				selected_cls = tf.argmin(class_counts)
-			elif mode == 'single':
-				file = 'data/coco_classes.txt'
-				with open(file) as f:
-					class_names = f.readlines()
-				class_names = [c.strip() for c in class_names]
-				selected_cls = class_names.index(target_class)
-			selected_cls = tf.cast(selected_cls, tf.int32)  
-			index = tf.equal(box_classes, selected_cls)
-			index = tf.cast(index, tf.int32)
-			_, selected_boxes = tf.dynamic_partition(boxes, index, num_partitions=2, name='dynamic_partition')
-			_, selected_scores = tf.dynamic_partition(box_scores, index, num_partitions=2, name='dynamic_partition')
-			selected_boxes = tf.reshape(selected_boxes, [BATCH_SIZE, -1, 4])
-			selected_scores = tf.reshape(selected_scores, [BATCH_SIZE, -1, CLASS_NUM])
-			if objectness == None:
-				return selected_boxes, None, selected_scores
-			_, selected_objectness = tf.dynamic_partition(objectness, index, num_partitions=2, name='dynamic_partition')
-			selected_objectness = tf.reshape(selected_objectness, [BATCH_SIZE, -1, 1])
-			return selected_boxes, selected_objectness, selected_scores
-
 		def mask(img):
 			"""
 			generate a mask for constrainting perturbations on to an object
@@ -361,8 +324,6 @@ class Daedalus:
 			print(outs)
 			# (N, 3549, 3, 4), (N, 3549, 3, 1), (N, 3549, 3, 80)
 			boxes, objectness, classprobs = process_output(outs)
-			boxes, objectness, classprobs = select_class(self.target_class, boxes, objectness, classprobs, mode=self.attack_mode)
-			print(boxes, objectness, classprobs)
 			self.bx = boxes[..., 0:1]
 			self.by = boxes[..., 1:2]
 			self.bw = boxes[..., 2:3]
