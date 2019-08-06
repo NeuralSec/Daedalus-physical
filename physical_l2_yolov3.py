@@ -41,7 +41,7 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-SAVE_PATH = 'adv_examples/L2/f3/{0}/{1}/'.format(ATTACK_MODE, ATTACK_CLASS)
+SAVE_PATH = 'physical_examples/'
 # select GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = '{0}'.format(GPU_ID)
 
