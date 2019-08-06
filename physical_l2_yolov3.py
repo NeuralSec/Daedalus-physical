@@ -245,7 +245,7 @@ class Daedalus:
 	"""
 	Daedalus adversarial example generator based on the Yolo v3 model.
 	"""
-	def __init__(self, sess, model, img_shape=IMAGE_SHAPE, batch_size=BATCH_SIZE, confidence=CONFIDENCE, du_num=EOT_NUM
+	def __init__(self, sess, model, img_shape=IMAGE_SHAPE, batch_size=BATCH_SIZE, confidence=CONFIDENCE, du_num=EOT_NUM,
 				 learning_rate=LEARNING_RATE, binary_search_steps=BINARY_SEARCH_STEPS, max_iterations=MAX_ITERATIONS,
 				 abort_early=ABORT_EARLY, initial_consts=INITIAL_consts, boxmin=0, boxmax=1):
 		self.sess = sess
