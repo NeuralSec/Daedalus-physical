@@ -260,17 +260,48 @@ class Daedalus:
 		self.yolo_model = model
 		self.confidence = confidence
 
-		def mask(img):
+		def positions(position, sample_n):
+			'''
+			Sampling sample_n locations of perturbations on an image from a uniform distribution
+			'''
+			with tf.name_scope('generate_mask'):
+				W = tf.shape(img)[-2]
+				# set positions of the perturbation according to a uniform distribution
+				center_coords = np.random.uniform(perturb_size, W-perturb_size, sample_n)
+				return center_coords
+
+		def scaling(pert, sample_n):
+			'''
+			Sampling sample_n scales of perturbation 
+			'''
+			return np.random.uniform(0, 1, sample_n)
+
+
+		def mask(img, perturb_size=100):
 			"""
 			generate a mask for constrainting perturbations on to an object
 			Arguments:
 				# img: a image containing an object to perturb
 			Return:
-				# msk: a tensor mask
+				# mask_c: a tensor mask to mask variables
+				# mask_v: a tensor mask to mask constant
 			"""
 			with tf.name_scope('generate_mask'):
+				W = tf.shape(img)[-2]
+				mask_c = tf.Variable(np.zeros((batch_size,
+											   img_shape[0],
+											   img_shape[1],
+											   img_shape[2])), dtype=tf.float32, name='mask-c')
+				mask_v = tf.Variable(np.zeros((batch_size,
+											   img_shape[0],
+											   img_shape[1],
+											   img_shape[2])), dtype=tf.float32, name='msak-v')
+				W = tf.shape(img)[-2]
+				C = tf.shape(img)[-1]
+				# set positions of the perturbation according to a uniform distribution
+				center_coords = tf.random.uniform([], perturb_size, W-perturb_size)
 				msk = img
-				return msk
+				return mask_c ,mask_v
 
 		def transformations(perturbs):
 			'''
@@ -295,10 +326,17 @@ class Daedalus:
 
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
-			perturbations = tf.Variable(np.zeros((batch_size,
+			global_perturbations = tf.Variable(np.zeros((batch_size,
 												  img_shape[0],
 												  img_shape[1],
 												  img_shape[2])), dtype=tf.float32, name='perturbations')
+			pads = tf.constant(np.zeros((batch_size,
+									     img_shape[0],
+									     img_shape[1],
+									     img_shape[2])), dtype=tf.float32, name='perturbations')
+			mask_c, mask_v = mask(global_perturbations)
+ 			perturbations = mask_c * pads + mask_v * global_perturbations 
+
 			# tf variables to sending data to tf:
 			self.timgs = tf.Variable(np.zeros((batch_size,
 											   img_shape[0],
