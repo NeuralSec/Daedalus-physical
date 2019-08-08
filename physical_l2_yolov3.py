@@ -260,23 +260,6 @@ class Daedalus:
 		self.yolo_model = model
 		self.confidence = confidence
 
-		def positions(position, sample_n):
-			'''
-			Sampling sample_n locations of perturbations on an image from a uniform distribution
-			'''
-			with tf.name_scope('generate_mask'):
-				W = tf.shape(img)[-2]
-				# set positions of the perturbation according to a uniform distribution
-				center_coords = np.random.uniform(perturb_size, W-perturb_size, sample_n)
-				return center_coords
-
-		def scaling(pert, sample_n):
-			'''
-			Sampling sample_n scales of perturbation 
-			'''
-			return np.random.uniform(0, 1, sample_n)
-
-
 		def mask(img, perturb_size=100):
 			"""
 			generate a mask for constrainting perturbations on to an object
@@ -286,6 +269,24 @@ class Daedalus:
 				# mask_c: a tensor mask to mask variables
 				# mask_v: a tensor mask to mask constant
 			"""
+			def shifting(position, sample_n):
+				'''
+				Sampling sample_n locations of perturbations on an image from a uniform distribution
+				'''
+				with tf.name_scope('generate_mask'):
+					W = tf.shape(img)[-2]
+					# set positions of the perturbation according to a uniform distribution
+					center_coords = np.random.uniform(perturb_size, W-perturb_size, sample_n)
+					return center_coords
+
+			def rotates(pert, sample_n):
+				'''
+				Sampling sample_n scales of perturbation 
+				'''
+				with tf.name_scope('rotate_perturbations'):
+					angles = np.pi * tf.random.uniform([sample_n], -0.1, 0.1)
+					return tf.contrib.image.rotate(pert, angles, interpolation='NEAREST', name='rotated_imgs')
+			
 			with tf.name_scope('generate_mask'):
 				W = tf.shape(img)[-2]
 				mask_c = tf.Variable(np.zeros((batch_size,
@@ -300,6 +301,7 @@ class Daedalus:
 				C = tf.shape(img)[-1]
 				# set positions of the perturbation according to a uniform distribution
 				center_coords = tf.random.uniform([], perturb_size, W-perturb_size)
+
 				msk = img
 				return mask_c ,mask_v
 
