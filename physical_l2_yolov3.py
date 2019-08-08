@@ -279,7 +279,15 @@ class Daedalus:
 					newscale = tf.random.uniform([], tf.minimum(0.9*perturb_size, W), tf.minimum(1.1*perturb_size, W))
 					return tf.image.resize_images(pert, [newscale, newscale])
 
-			def shift(pert, img):
+			def rotates(pert):
+				'''
+				Rotate masks
+				'''
+				with tf.name_scope('rotate'):
+					angles = np.pi * tf.random.uniform([], -0.1, 0.1)
+					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
+
+			def pad_n_shift(pert, img):
 				'''
 				Shift masks
 				'''
@@ -290,31 +298,17 @@ class Daedalus:
 					center_coords = tf.random.uniform([], perturb_size, W-perturb_size)
 					return center_coords
 
-			def rotates(pert):
-				'''
-				Rotate masks
-				'''
-				with tf.name_scope('rotate'):
-					angles = np.pi * tf.random.uniform([], -0.1, 0.1)
-					return tf.contrib.image.rotate(pert, angles, interpolation='NEAREST', name='rotated_imgs')
-
 			with tf.name_scope('generate_mask'):
 				W = tf.shape(img)[-2]
-				mask_c = tf.Variable(np.zeros((batch_size,
-											   img_shape[0],
-											   img_shape[1],
-											   img_shape[2])), dtype=tf.float32, name='mask-c')
-				mask_v = tf.Variable(np.zeros((batch_size,
-											   img_shape[0],
-											   img_shape[1],
-											   img_shape[2])), dtype=tf.float32, name='msak-v')
-				W = tf.shape(img)[-2]
 				C = tf.shape(img)[-1]
+				mask_v = tf.Variable(np.zeros((batch_size,
+											   perturb_size,
+											   perturb_size,
+											   perturb_size)), dtype=tf.float32, name='mask-v')
+				transformed_mask = rotates(scale(mask_v, img))
+				
 				# set positions of the perturbation according to a uniform distribution
-				center_coords = tf.random.uniform([], perturb_size, W-perturb_size)
-
-				msk = img
-				return mask_c ,mask_v
+				return pad_n_shift(transformed_mask, img)
 
 		def transformations(perturbs):
 			'''
