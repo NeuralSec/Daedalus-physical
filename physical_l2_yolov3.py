@@ -269,24 +269,35 @@ class Daedalus:
 				# mask_c: a tensor mask to mask variables
 				# mask_v: a tensor mask to mask constant
 			"""
-			def shifting(position, sample_n):
+			def scale(pert, img):
 				'''
-				Sampling sample_n locations of perturbations on an image from a uniform distribution
+				Scale masks
 				'''
-				with tf.name_scope('generate_mask'):
+				with tf.name_scope('scale'):
 					W = tf.shape(img)[-2]
+					perturb_size = tf.shape(pert)[-2]
+					newscale = tf.random.uniform([], tf.minimum(0.9*perturb_size, W), tf.minimum(1.1*perturb_size, W))
+					return tf.image.resize_images(pert, [newscale, newscale])
+
+			def shift(pert, img):
+				'''
+				Shift masks
+				'''
+				with tf.name_scope('shift'):
+					W = tf.shape(img)[-2]
+					perturb_size = tf.shape(pert)[-2]
 					# set positions of the perturbation according to a uniform distribution
-					center_coords = np.random.uniform(perturb_size, W-perturb_size, sample_n)
+					center_coords = tf.random.uniform([], perturb_size, W-perturb_size)
 					return center_coords
 
-			def rotates(pert, sample_n):
+			def rotates(pert):
 				'''
-				Sampling sample_n scales of perturbation 
+				Rotate masks
 				'''
-				with tf.name_scope('rotate_perturbations'):
-					angles = np.pi * tf.random.uniform([sample_n], -0.1, 0.1)
+				with tf.name_scope('rotate'):
+					angles = np.pi * tf.random.uniform([], -0.1, 0.1)
 					return tf.contrib.image.rotate(pert, angles, interpolation='NEAREST', name='rotated_imgs')
-			
+
 			with tf.name_scope('generate_mask'):
 				W = tf.shape(img)[-2]
 				mask_c = tf.Variable(np.zeros((batch_size,
