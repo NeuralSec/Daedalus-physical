@@ -327,9 +327,7 @@ class Daedalus:
 											   img_shape[0],
 											   img_shape[1],
 											   img_shape[2])), dtype=tf.float32, name='self.timgs')
-			transformed_pertbations = []
-			for i in range(batch_size):
-				transformed_pertbations.extend(transform_perturbation(perturbation, self.timgs[i:i+1]))
+			transformed_pertbations = transform_perturbation(perturbation, self.timgs)
 				
 			self.consts = tf.Variable(np.zeros(batch_size), dtype=tf.float32, name='self.consts')
 
