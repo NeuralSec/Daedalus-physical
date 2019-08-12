@@ -31,8 +31,8 @@ from tqdm import tqdm
 GPU_ID = 1							# which gpu to used
 EOT_NUM = 10
 CONFIDENCE = 0.3					# the confidence of attack
-EXAMPLE_NUM = 2					# total number of adversarial example to generate.
-BATCH_SIZE = 2						# number of adversarial example generated in each batch
+EXAMPLE_NUM = 1					# total number of adversarial example to generate.
+BATCH_SIZE = 1						# number of adversarial example generated in each batch
 
 BINARY_SEARCH_STEPS = 5     		# number of times to adjust the constsant with binary search
 INITIAL_consts = 1e1	        	# the initial constsant c to pick as a first guess
@@ -266,7 +266,7 @@ class Daedalus:
 			generate a mask for constrainting perturbations on to an object
 			Arguments:
 				# pert: a perturbation tensor
-				# img: an image containing an object to perturb (W,W,C)
+				# img: an image containing an object to perturb (1,W,W,C)
 			Return:
 				# a transformed perturbation
 			"""
@@ -300,7 +300,7 @@ class Daedalus:
 					top = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int64)
 					right = left + perturb_size
 					bottom = top + perturb_size
-					pads = tf.constant([[left, W-right],[top, W-bottom],[0,0]])
+					pads = tf.constant([[0,0],[left, W-right],[top, W-bottom],[0,0]])
 					return tf.pad(pert, pads)
 
 			with tf.name_scope('generate_mask'):
