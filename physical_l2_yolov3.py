@@ -317,17 +317,20 @@ class Daedalus:
 
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
-			perturbations = tf.Variable(np.zeros((batch_size,
-											      pert_shape[0],
-											      pert_shape[1],
-											      pert_shape[2])), dtype=tf.float32, name='perturbations')
+			perturbation = tf.Variable(np.zeros((1,
+											     pert_shape[0],
+											     pert_shape[1],
+											     pert_shape[2])), dtype=tf.float32, name='perturbation')
 
 			# tf variables to sending data to tf:
 			self.timgs = tf.Variable(np.zeros((batch_size,
 											   img_shape[0],
 											   img_shape[1],
 											   img_shape[2])), dtype=tf.float32, name='self.timgs')
-			transformed_pertbations = transform_perturbation(perturbations, self.timgs)
+			transformed_pertbations = []
+			for i in range(batch_size):
+				transformed_pertbations.extend(transform_perturbation(perturbation, self.timgs[i:i+1]))
+				
 			self.consts = tf.Variable(np.zeros(batch_size), dtype=tf.float32, name='self.consts')
 
 			# and here's what we use to assign them:
