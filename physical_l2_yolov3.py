@@ -301,7 +301,9 @@ class Daedalus:
 					top = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int32)
 					right = left + perturb_size
 					bottom = top + perturb_size
-					pads = tf.constant([[0,0],[left, W-right],[top, W-bottom],[0,0]])
+					print(left, right, top, bottom, W)
+					pads = tf.stack([[0,0],tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
+					print(pads)
 					return tf.pad(pert, pads)
 
 			with tf.name_scope('generate_mask'):
