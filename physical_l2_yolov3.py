@@ -31,7 +31,7 @@ from tqdm import tqdm
 GPU_ID = 1							# which gpu to used
 EOT_NUM = 10
 CONFIDENCE = 0.3					# the confidence of attack
-EXAMPLE_NUM = 1000					# total number of adversarial example to generate.
+EXAMPLE_NUM = 10					# total number of adversarial example to generate.
 BATCH_SIZE = 1						# number of adversarial example generated in each batch
 
 BINARY_SEARCH_STEPS = 5     		# number of times to adjust the constsant with binary search
@@ -448,11 +448,11 @@ class Daedalus:
 					_, l, l2s, l1s, nimgs, c, pertb = self.sess.run([self.train, self.loss, self.l2dist, self.loss_adv, self.newimgs, self.consts, self.perturbation])
 					# print out the losses every 10%
 					if iteration % (self.MAX_ITERATIONS // 10) == 0:
-						print('===iteration:', iteration, '===')
-						print('attacked box number:', sess.run(self.bw).shape)
-						print('loss values of box confidence and dimension:', sess.run([self.loss1_1_x, self.f3]))
-						print('adversarial losses:', l1s)
-						print('distortions:', l2s)
+						print('\n===iteration:', iteration, '===')
+						print('\nattacked box number:', sess.run(self.bw).shape)
+						print('\nloss values of box confidence and dimension:', sess.run([self.loss1_1_x, self.f3]))
+						print('\nadversarial losses:', l1s)
+						print('\ndistortions:', l2s)
 
 					# check if we should abort search if we're getting nowhere.
 					if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
