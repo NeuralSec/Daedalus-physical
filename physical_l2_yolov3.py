@@ -41,6 +41,7 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
+PERT_SHAPE = (100, 100, 3)
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = '{0}'.format(GPU_ID)
@@ -245,7 +246,7 @@ class Daedalus:
 	"""
 	Daedalus adversarial example generator based on the Yolo v3 model.
 	"""
-	def __init__(self, sess, model, img_shape=IMAGE_SHAPE, batch_size=BATCH_SIZE, confidence=CONFIDENCE, du_num=EOT_NUM,
+	def __init__(self, sess, model, pert_shape=PERT_SHAPE, img_shape=IMAGE_SHAPE, batch_size=BATCH_SIZE, confidence=CONFIDENCE, du_num=EOT_NUM,
 				 learning_rate=LEARNING_RATE, binary_search_steps=BINARY_SEARCH_STEPS, max_iterations=MAX_ITERATIONS,
 				 abort_early=ABORT_EARLY, initial_consts=INITIAL_consts, boxmin=0, boxmax=1):
 		self.sess = sess
@@ -260,14 +261,14 @@ class Daedalus:
 		self.yolo_model = model
 		self.confidence = confidence
 
-		def mask(img, perturb_size=100):
+		def transform_perturbation(pert, img):
 			"""
 			generate a mask for constrainting perturbations on to an object
 			Arguments:
-				# img: a image containing an object to perturb
+				# pert: a perturbation tensor
+				# img: an image containing an object to perturb (W,W,C)
 			Return:
-				# mask_c: a tensor mask to mask variables
-				# mask_v: a tensor mask to mask constant
+				# a transformed perturbation
 			"""
 			def scale(pert, img):
 				'''
@@ -276,7 +277,7 @@ class Daedalus:
 				with tf.name_scope('scale'):
 					W = tf.shape(img)[-2]
 					perturb_size = tf.shape(pert)[-2]
-					newscale = tf.random.uniform([], tf.minimum(0.9*perturb_size, W), tf.minimum(1.1*perturb_size, W))
+					newscale = tf.random.uniform((), tf.minimum(0.9*perturb_size, W), tf.minimum(1.1*perturb_size, W))
 					return tf.image.resize_images(pert, [newscale, newscale])
 
 			def rotates(pert):
@@ -284,65 +285,39 @@ class Daedalus:
 				Rotate masks
 				'''
 				with tf.name_scope('rotate'):
-					angles = np.pi * tf.random.uniform([], -0.1, 0.1)
+					angles = np.pi * tf.random.uniform((), -0.1, 0.1)
 					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
 
 			def pad_n_shift(pert, img):
 				'''
-				Shift masks
+				Shift and pad perturbation into img size
 				'''
 				with tf.name_scope('shift'):
 					W = tf.shape(img)[-2]
 					perturb_size = tf.shape(pert)[-2]
 					# set positions of the perturbation according to a uniform distribution
-					center_coords = tf.random.uniform([], perturb_size, W-perturb_size)
-					return center_coords
+					left = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int64)
+					top = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int64)
+					right = left + perturb_size
+					bottom = top + perturb_size
+					pads = tf.constant([[left, W-right],[top, W-bottom],[0,0]])
+					return tf.pad(pert, pads)
 
 			with tf.name_scope('generate_mask'):
 				W = tf.shape(img)[-2]
 				C = tf.shape(img)[-1]
-				mask_v = tf.Variable(np.zeros((batch_size,
-											   perturb_size,
-											   perturb_size,
-											   perturb_size)), dtype=tf.float32, name='mask-v')
-				transformed_mask = rotates(scale(mask_v, img))
-				
-				# set positions of the perturbation according to a uniform distribution
+				transformed_mask = rotates(scale(pert, img))
 				return pad_n_shift(transformed_mask, img)
-
-		def transformations(perturbs):
-			'''
-			Arguments:
-				# perturbs: perturbation tensors in shape (B, X, X, C).
-				# self.du_num: number of image duplications for transformations.
-			Return:
-				# perturbs: the transformed images tensors.
-			'''
-			with tf.name_scope('transformations'):
-				W = tf.shape(perturbs)[-2]
-				C = tf.shape(perturbs)[-1]
-				perturbs = tf.concat([perturbs]*self.du_num, axis=0) 
-				angles = np.pi * tf.random.uniform(self.du_num, -0.15, 0.15)
-				perturbs = tf.contrib.image.rotate(perturbs, angles, interpolation='NEAREST', name='rotated_imgs')
-				perturbs = tf.reshape(tf.stack([perturbs]*self.du_num), [-1, W, W, C])
-				perturbs = tf.image.random_brightness(perturbs, 0.1)
-				return tf.clip_by_value(perturbs, 0, 1) #(self.du_num**2, B, W, W, C)
 
 		def NPS(imgs):
 			return
 
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
-			global_perturbations = tf.Variable(np.zeros((batch_size,
-												  img_shape[0],
-												  img_shape[1],
-												  img_shape[2])), dtype=tf.float32, name='perturbations')
-			pads = tf.constant(np.zeros((batch_size,
-									     img_shape[0],
-									     img_shape[1],
-									     img_shape[2])), dtype=tf.float32, name='perturbations')
-			mask_c, mask_v = mask(global_perturbations)
- 			perturbations = mask_c * pads + mask_v * global_perturbations 
+			perturbations = tf.Variable(np.zeros((batch_size,
+											      pert_shape[0],
+											      pert_shape[1],
+											      pert_shape[2])), dtype=tf.float32, name='perturbations')
 
 			# tf variables to sending data to tf:
 			self.timgs = tf.Variable(np.zeros((batch_size,
@@ -364,7 +339,7 @@ class Daedalus:
 			self.boxplus = (boxmin + boxmax) / 2.
 			self.newimgs = tf.tanh(perturbations + self.timgs) * self.boxmul + self.boxplus
 			
-			transformed_perturbs = transformations(perturbations)
+			transformed_pertbations = transform_perturbation(perturbations, self.timgs)
 			eot_imgs = tf.tanh(transformed_perturbs + self.timgs) * self.boxmul + self.boxplus
 
 			# Get prediction from the model:
