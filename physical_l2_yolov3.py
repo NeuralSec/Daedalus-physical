@@ -389,7 +389,7 @@ class Daedalus:
 		self.setup.append(self.timgs.assign(self.assign_timgs))
 		self.setup.append(self.consts.assign(self.assign_consts))
 		self.init = tf.variables_initializer(var_list=new_vars)
-		self.reset_perturbation = tf.variables_initializer(var_list=[perturbations])
+		self.reset_perturbation = tf.variables_initializer(var_list=[perturbation])
 	
 	def attack_batch(self, imgs):
 		"""
