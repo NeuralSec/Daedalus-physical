@@ -275,7 +275,7 @@ class Daedalus:
 				Scale masks
 				'''
 				with tf.name_scope('scale'):
-					W = tf.shape(img)[-2]
+					W = tf.cast(tf.shape(img)[-2], tf.float32)
 					perturb_size = tf.cast(tf.shape(pert)[-2], tf.float32)
 					newscale = tf.random.uniform((), tf.minimum(0.9*perturb_size, W), tf.minimum(1.1*perturb_size, W))
 					_to_size = tf.cast(newscale, tf.int32)
