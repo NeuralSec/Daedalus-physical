@@ -324,6 +324,7 @@ class Daedalus:
 											   img_shape[0],
 											   img_shape[1],
 											   img_shape[2])), dtype=tf.float32, name='self.timgs')
+			transformed_pertbations = transform_perturbation(perturbations, self.timgs)
 			self.consts = tf.Variable(np.zeros(batch_size), dtype=tf.float32, name='self.consts')
 
 			# and here's what we use to assign them:
@@ -337,13 +338,10 @@ class Daedalus:
 			# boxmin to boxmax:
 			self.boxmul = (boxmax - boxmin) / 2.
 			self.boxplus = (boxmin + boxmax) / 2.
-			self.newimgs = tf.tanh(perturbations + self.timgs) * self.boxmul + self.boxplus
-			
-			transformed_pertbations = transform_perturbation(perturbations, self.timgs)
-			eot_imgs = tf.tanh(transformed_perturbs + self.timgs) * self.boxmul + self.boxplus
+			self.newimgs = tf.tanh(transformed_pertbations + self.timgs) * self.boxmul + self.boxplus
 
 			# Get prediction from the model:
-			outs = self.yolo_model._yolo(eot_imgs)
+			outs = self.yolo_model._yolo(self.newimgs)
 			# [(N, 13, 13, 3, 85), (N, 26, 26, 3, 85), (N, 52, 52, 3, 85)]
 			print(outs)
 			# (N, 3549, 3, 4), (N, 3549, 3, 1), (N, 3549, 3, 80)
