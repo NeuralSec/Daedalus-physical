@@ -388,8 +388,9 @@ class Daedalus:
 		self.setup = []
 		self.setup.append(self.timgs.assign(self.assign_timgs))
 		self.setup.append(self.consts.assign(self.assign_consts))
-		self.init = tf.variables_initializer(var_list=[perturbations] + new_vars)
-
+		self.init = tf.variables_initializer(var_list=new_vars)
+		self.reset_perturbation = tf.variables_initializer(var_list=[perturbations])
+	
 	def attack_batch(self, imgs):
 		"""
 		Run the attack on a batch of images and labels.
@@ -415,74 +416,76 @@ class Daedalus:
 		o_bestl2 = [1e10] * batch_size
 		o_bestloss = [1e10] * batch_size
 		o_bestattack = [np.zeros(imgs[0].shape)] * batch_size
+		self.sess.run(self.reset_perturbation)
 
-		for outer_step in range(self.BINARY_SEARCH_STEPS):
-			# completely reset adam's internal state.
-			self.sess.run(self.init)
+		for img_ind in range(imgs.shape[0]):
+			batch = imgs[img_ind:img_ind+1]
 
-			# take in the current data batch.
-			batch = imgs[:batch_size]
+			for outer_step in range(self.BINARY_SEARCH_STEPS):
+				# completely reset adam's internal state.
+				self.sess.run(self.init)
 
-			# cache the current best l2 and score.
-			bestl2 = [1e10] * batch_size
-			# bestconfidence = [-1]*batch_size
-			bestloss = [1e10] * batch_size
+				# cache the current best l2 and score.
+				bestl2 = [1e10] * batch_size
+				# bestconfidence = [-1]*batch_size
+				bestloss = [1e10] * batch_size
 
-			# The last iteration (if we run many steps) repeat the search once.
-			if self.repeat and outer_step == self.BINARY_SEARCH_STEPS - 1:
-				consts = upper_bound
+				# The last iteration (if we run many steps) repeat the search once.
+				if self.repeat and outer_step == self.BINARY_SEARCH_STEPS - 1:
+					consts = upper_bound
 
-			# set the variables so that we don't have to send them over again.
-			self.sess.run(self.setup, {self.assign_timgs: batch,
-									   self.assign_consts: consts})
+				# set the variables so that we don't have to send them over again.
+				self.sess.run(self.setup, {self.assign_timgs: batch,
+										   self.assign_consts: consts})
 
-			# start gradient descent attack
-			print('adjust c to:', sess.run(self.consts))
-			init_loss = sess.run(self.loss)
-			init_adv_losses = sess.run(self.loss_adv)
-			prev = init_loss * 1.1
-			for iteration in tqdm(range(self.MAX_ITERATIONS)):
-				# perform the attack on a single example
-				_, l, l2s, l1s, nimgs, c = self.sess.run([self.train, self.loss, self.l2dist, self.loss_adv, self.newimgs, self.consts])
-				# print out the losses every 10%
-				if iteration % (self.MAX_ITERATIONS // 10) == 0:
-					print('===iteration:', iteration, '===')
-					print('attacked box number:', sess.run(self.bw).shape)
-					print('loss values of box confidence and dimension:', sess.run([self.loss1_1_x, self.f3]))
-					print('adversarial losses:', l1s)
-					print('distortions:', l2s)
+				# start gradient descent attack
+				print('adjust c to:', sess.run(self.consts))
+				init_loss = sess.run(self.loss)
+				init_adv_losses = sess.run(self.loss_adv)
+				prev = init_loss * 1.5
+				for iteration in tqdm(range(self.MAX_ITERATIONS)):
+					# perform the attack on a single example
+					_, l, l2s, l1s, nimgs, c = self.sess.run([self.train, self.loss, self.l2dist, self.loss_adv, self.newimgs, self.consts])
+					# print out the losses every 10%
+					if iteration % (self.MAX_ITERATIONS // 10) == 0:
+						print('===iteration:', iteration, '===')
+						print('attacked box number:', sess.run(self.bw).shape)
+						print('loss values of box confidence and dimension:', sess.run([self.loss1_1_x, self.f3]))
+						print('adversarial losses:', l1s)
+						print('distortions:', l2s)
 
-				# check if we should abort search if we're getting nowhere.
-				if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
-					if l > prev * .9999:
-						break
-					prev = l
-				# update the best result found so far
-				for e, (l1, l2, ii) in enumerate(zip(l1s, l2s, nimgs)):
-					print(l2, bestl2[e], l1, init_adv_losses[e])
-					if l2 < bestl2[e] and check_success(l1, init_adv_losses[e]):
-						bestl2[e] = l2
-						bestloss[e] = l1
-					if l2 < o_bestl2[e] and check_success(l1, init_adv_losses[e]):
-						o_bestl2[e] = l2
-						o_bestloss[e] = l1
-						o_bestattack[e] = ii
+					# check if we should abort search if we're getting nowhere.
+					if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
+						if l > prev * .9999:
+							break
+						prev = l
+					# update the best result found so far
+					for e, (l1, l2, ii) in enumerate(zip(l1s, l2s, nimgs)):
+						print(l2, bestl2[e], l1, init_adv_losses[e])
+						if l2 < bestl2[e] and check_success(l1, init_adv_losses[e]):
+							bestl2[e] = l2
+							bestloss[e] = l1
+						if l2 < o_bestl2[e] and check_success(l1, init_adv_losses[e]):
+							o_bestl2[e] = l2
+							o_bestloss[e] = l1
+							o_bestattack[e] = ii
 
-			# adjust the constsant as needed
-			for e in range(batch_size):
-				if check_success(l1s[e], init_adv_losses[e]):
-					# success, divide consts by two
-					upper_bound[e] = min(upper_bound[e], consts[e])
-					if upper_bound[e] < 1e9:
-						consts[e] = (lower_bound[e] + upper_bound[e]) / 2
-				else:
-					# failure, either multiply by 10 if no solution found yet
-					#          or do binary search with the known upper bound
-					lower_bound[e] = max(lower_bound[e], consts[e])
-					if upper_bound[e] < 1e9:
-						consts[e] = (lower_bound[e] + upper_bound[e]) / 2
+				# adjust the constsant as needed
+				for e in range(batch_size):
+					if check_success(l1s[e], init_adv_losses[e]):
+						# success, divide consts by two
+						upper_bound[e] = min(upper_bound[e], consts[e])
+						if upper_bound[e] < 1e9:
+							consts[e] = (lower_bound[e] + upper_bound[e]) / 2
 					else:
-						consts[e] *= 10
+						# failure, either multiply by 10 if no solution found yet
+						#          or do binary search with the known upper bound
+						self.sess.run(self.reset_perturbation)
+						lower_bound[e] = max(lower_bound[e], consts[e])
+						if upper_bound[e] < 1e9:
+							consts[e] = (lower_bound[e] + upper_bound[e]) / 2
+						else:
+							consts[e] *= 10
 		# return the best solution found
 		o_bestl2 = np.array(o_bestl2)
 		return o_bestattack, o_bestl2
