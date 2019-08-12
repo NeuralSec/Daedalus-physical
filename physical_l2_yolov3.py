@@ -297,8 +297,8 @@ class Daedalus:
 					W = tf.shape(img)[-2]
 					perturb_size = tf.shape(pert)[-2]
 					# set positions of the perturbation according to a uniform distribution
-					left = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int64)
-					top = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int64)
+					left = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int32)
+					top = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int32)
 					right = left + perturb_size
 					bottom = top + perturb_size
 					pads = tf.constant([[0,0],[left, W-right],[top, W-bottom],[0,0]])
