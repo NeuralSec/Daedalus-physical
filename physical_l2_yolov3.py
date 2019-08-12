@@ -31,7 +31,7 @@ from tqdm import tqdm
 GPU_ID = 1							# which gpu to used
 EOT_NUM = 10
 CONFIDENCE = 0.3					# the confidence of attack
-EXAMPLE_NUM = 1					# total number of adversarial example to generate.
+EXAMPLE_NUM = 1000					# total number of adversarial example to generate.
 BATCH_SIZE = 1						# number of adversarial example generated in each batch
 
 BINARY_SEARCH_STEPS = 5     		# number of times to adjust the constsant with binary search
@@ -317,7 +317,7 @@ class Daedalus:
 
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
-			perturbation = tf.Variable(np.zeros((1,
+			self.perturbation = tf.Variable(np.zeros((1,
 											     pert_shape[0],
 											     pert_shape[1],
 											     pert_shape[2])), dtype=tf.float32, name='perturbation')
@@ -327,7 +327,7 @@ class Daedalus:
 											   img_shape[0],
 											   img_shape[1],
 											   img_shape[2])), dtype=tf.float32, name='self.timgs')
-			transformed_pertbations = transform_perturbation(perturbation, self.timgs)
+			transformed_pertbations = transform_perturbation(self.perturbation, self.timgs)
 				
 			self.consts = tf.Variable(np.zeros(batch_size), dtype=tf.float32, name='self.consts')
 
@@ -380,7 +380,7 @@ class Daedalus:
 		# Setup the adam optimizer and keep track of variables we're creating
 		start_vars = set(x.name for x in tf.global_variables())
 		optimizer = tf.train.AdamOptimizer(self.LEARNING_RATE)
-		self.train = optimizer.minimize(self.loss, var_list=[perturbations])
+		self.train = optimizer.minimize(self.loss, var_list=[self.perturbation])
 		end_vars = tf.global_variables()
 		new_vars = [x for x in end_vars if x.name not in start_vars]
 
@@ -389,7 +389,7 @@ class Daedalus:
 		self.setup.append(self.timgs.assign(self.assign_timgs))
 		self.setup.append(self.consts.assign(self.assign_consts))
 		self.init = tf.variables_initializer(var_list=new_vars)
-		self.reset_perturbation = tf.variables_initializer(var_list=[perturbation])
+		self.reset_perturbation = tf.variables_initializer(var_list=[self.perturbation])
 	
 	def attack_batch(self, imgs):
 		"""
@@ -445,7 +445,7 @@ class Daedalus:
 				prev = init_loss * 1.5
 				for iteration in tqdm(range(self.MAX_ITERATIONS)):
 					# perform the attack on a single example
-					_, l, l2s, l1s, nimgs, c = self.sess.run([self.train, self.loss, self.l2dist, self.loss_adv, self.newimgs, self.consts])
+					_, l, l2s, l1s, nimgs, c, pertb = self.sess.run([self.train, self.loss, self.l2dist, self.loss_adv, self.newimgs, self.consts, self.perturbation])
 					# print out the losses every 10%
 					if iteration % (self.MAX_ITERATIONS // 10) == 0:
 						print('===iteration:', iteration, '===')
@@ -460,7 +460,7 @@ class Daedalus:
 							break
 						prev = l
 					# update the best result found so far
-					for e, (l1, l2, ii) in enumerate(zip(l1s, l2s, nimgs)):
+					for e, (l1, l2, ii) in enumerate(zip(l1s, l2s, pertb)):
 						print(l2, bestl2[e], l1, init_adv_losses[e])
 						if l2 < bestl2[e] and check_success(l1, init_adv_losses[e]):
 							bestl2[e] = l2
@@ -508,7 +508,7 @@ class Daedalus:
 				os.makedirs(path)
 			np.save(path+'/Distortions of images {0} to {1}.npy'.format(i, i+self.batch_size), dists)
 			for j in range(len(X_adv)):
-				io.imsave(path+'/Best example of {1} Distortion {2}.png'.format(self.confidence, i+j, dists[j]), X_adv[j])			
+				io.imsave(path+'/Perturbation of {1} Distortion {2}.png'.format(self.confidence, i+j, dists[j]), X_adv[j])			
 			r.extend(X_adv)
 			ds.extend(dists)
 		return np.array(r), np.array(ds)
