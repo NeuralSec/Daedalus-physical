@@ -276,9 +276,9 @@ class Daedalus:
 				'''
 				with tf.name_scope('scale'):
 					W = tf.shape(img)[-2]
-					perturb_size = tf.shape(pert)[-2]
+					perturb_size = tf.cast(tf.shape(pert)[-2], tf.float32)
 					newscale = tf.random.uniform((), tf.minimum(0.9*perturb_size, W), tf.minimum(1.1*perturb_size, W))
-					_to_size = tf.cast(newscale*W, tf.int32)
+					_to_size = tf.cast(newscale, tf.int32)
 					return tf.image.resize_images(pert, [_to_size, _to_size])
 
 			def rotates(pert):
