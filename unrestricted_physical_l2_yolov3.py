@@ -367,12 +367,12 @@ class Daedalus:
 		self.train = optimizer.minimize(self.reduced_loss, var_list=[self.perturbation])
 		end_vars = tf.global_variables()
 		new_vars = [x for x in end_vars if x.name not in start_vars]
-
+		print('new_vars', new_vars)
+		
 		# these are the variables to initialize when we run
 		self.setup = []
 		self.setup.append(self.timgs.assign(self.assign_timgs))
-		self.init = tf.variables_initializer(var_list=new_vars)
-		self.reset_perturbation = tf.variables_initializer(var_list=[self.perturbation])
+		self.init = tf.global_variables_initializer()
 	
 	def attack(self, imgs, epochs=20):
 		"""
@@ -387,20 +387,17 @@ class Daedalus:
 		batch_size = self.batch_size
 		# convert images to arctanh-space
 		imgs = np.arctanh((imgs - self.boxplus) / self.boxmul * 0.999999)
-		
-		self.sess.run(self.reset_perturbation)
+		self.sess.run(self.init)
 		for batch_ind in range(int(imgs.shape[0]/batch_size)):
 			start = batch_size * batch_ind
 			end = start + batch_size
 			x_batch = imgs[start:end]
-			# set the variables so that we don't have to send them over again.
+
+			# set input images.
 			self.sess.run(self.setup, {self.assign_timgs: x_batch})
 			init_loss = sess.run(self.reduced_loss)
 			prev = init_loss * 1.2
 			for epoch in range(epochs):
-				# completely reset adam's internal state.
-				self.sess.run(self.init)
-
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
 					_, l, distortion, l1s, nimgs, pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation])
@@ -443,10 +440,10 @@ if __name__ == '__main__':
 	print('X_test shape:', X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
 	path = SAVE_PATH+'{0} confidence'.format(CONFIDENCE)
+	if not os.path.exists(path):
+		os.makedirs(path)
 	try:
 		perturbation, perturbed_images = attacker.attack(X_test, epochs=20)
-		if not os.path.exists(path):
-			os.makedirs(path)
 		io.imsave(path+'/Physical perturbation.png', perturbation)
 		np.save(path+'/perturbed_images.npy', perturbed_images)
 	except:
