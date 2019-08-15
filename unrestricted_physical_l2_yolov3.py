@@ -374,7 +374,7 @@ class Daedalus:
 		self.init = tf.variables_initializer(var_list=new_vars)
 		self.reset_perturbation = tf.variables_initializer(var_list=[self.perturbation])
 	
-	def attack_batch(self, imgs, epochs=10):
+	def attack(self, imgs, epochs=10):
 		"""
 		Run the attack on a batch of images and labels.
 		"""
@@ -430,25 +430,6 @@ class Daedalus:
 			if check_success(l, init_loss):
 				return pertb, nimgs
 
-	def attack(self, imgs):
-		"""
-		Perform the L_2 attack on the given images for the given targets.
-		If self.targeted is true, then the targets represents the target labels.
-		If self.targeted is false, then targets are the original class labels.
-		"""
-		r = []
-		ds = []
-		print('go up to', len(imgs))
-		for i in range(0, len(imgs), self.batch_size):
-			print('tick', i)
-			perturbation, perturbed_images = self.attack_batch(imgs[i:i + self.batch_size])
-			path = SAVE_PATH+'{0} confidence'.format(self.confidence)
-			if not os.path.exists(path):
-				os.makedirs(path)
-			io.imsave(path+'/Physical perturbation.png', perturbation)
-			np.save(path+'/perturbed_images.npy', perturbed_images)		
-		return
-
 if __name__ == '__main__':
 	sess = tf.InteractiveSession()
 	init = tf.global_variables_initializer()
@@ -470,6 +451,14 @@ if __name__ == '__main__':
 	X_test = np.concatenate(X_test, axis=0)
 	print('X_test shape:', X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
-	attacker.attack(X_test)
+	try:
+		perturbation, perturbed_images = attacker.attack(X_test, epochs=10)
+		if not os.path.exists(path):
+			os.makedirs(path)
+		io.imsave(path+'/Physical perturbation.png', perturbation)
+		np.save(path+'/perturbed_images.npy', perturbed_images)	
+	except:
+		print('Perturbation not found.')
+	path = SAVE_PATH+'{0} confidence'.format(self.confidence)
 	writer = tf.summary.FileWriter("log", sess.graph)
 	writer.close()
