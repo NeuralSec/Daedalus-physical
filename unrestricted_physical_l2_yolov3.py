@@ -451,6 +451,7 @@ if __name__ == '__main__':
 	X_test = np.concatenate(X_test, axis=0)
 	print('X_test shape:', X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
+	path = SAVE_PATH+'{0} confidence'.format(CONFIDENCE)
 	try:
 		perturbation, perturbed_images = attacker.attack(X_test, epochs=10)
 		if not os.path.exists(path):
@@ -459,6 +460,5 @@ if __name__ == '__main__':
 		np.save(path+'/perturbed_images.npy', perturbed_images)
 	except:
 		print('Perturbation not found.')
-	path = SAVE_PATH+'{0} confidence'.format(self.confidence)
 	writer = tf.summary.FileWriter("log", sess.graph)
 	writer.close()
