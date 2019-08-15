@@ -384,18 +384,11 @@ class Daedalus:
 			Check if the initial loss value has been reduced by 'self.confidence' percent
 			"""
 			return loss <= init_loss * (1 - self.confidence)
-
 		batch_size = self.batch_size
-
 		# convert images to arctanh-space
 		imgs = np.arctanh((imgs - self.boxplus) / self.boxmul * 0.999999)
-
-		# store the best l2, score, and image attack
-		o_bestl2 = [1e10] * batch_size
-		o_bestloss = [1e10] * batch_size
-		o_bestattack = [np.zeros(imgs[0].shape)] * batch_size
+		
 		self.sess.run(self.reset_perturbation)
-
 		for batch_ind in range(int(imgs.shape[0]/batch_size)):
 			start = batch_size * batch_ind
 			end = start + batch_size
