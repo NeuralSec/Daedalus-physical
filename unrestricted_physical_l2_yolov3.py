@@ -374,7 +374,7 @@ class Daedalus:
 		self.init = tf.variables_initializer(var_list=new_vars)
 		self.reset_perturbation = tf.variables_initializer(var_list=[self.perturbation])
 	
-	def attack(self, imgs, epochs=10):
+	def attack(self, imgs, epochs=20):
 		"""
 		Run the attack on a batch of images and labels.
 		"""
@@ -396,20 +396,17 @@ class Daedalus:
 		o_bestattack = [np.zeros(imgs[0].shape)] * batch_size
 		self.sess.run(self.reset_perturbation)
 
-		# start gradient descent attack
-		init_loss = sess.run(self.reduced_loss)
-		prev = init_loss * 1.2
-		for epoch in range(epochs):
-			for batch_ind in range(int(imgs.shape[0]/batch_size)):
-				start = batch_size * batch_ind
-				end = start + batch_size
-				x_batch = imgs[start:end]
-
+		for batch_ind in range(int(imgs.shape[0]/batch_size)):
+			start = batch_size * batch_ind
+			end = start + batch_size
+			x_batch = imgs[start:end]
+			# set the variables so that we don't have to send them over again.
+			self.sess.run(self.setup, {self.assign_timgs: x_batch})
+			init_loss = sess.run(self.reduced_loss)
+			prev = init_loss * 1.2
+			for epoch in range(epochs):
 				# completely reset adam's internal state.
 				self.sess.run(self.init)
-
-				# set the variables so that we don't have to send them over again.
-				self.sess.run(self.setup, {self.assign_timgs: x_batch})
 
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
@@ -427,8 +424,9 @@ class Daedalus:
 						if l > prev * .9999:
 							break
 						prev = l
-			if check_success(l, init_loss):
-				return pertb, nimgs
+				if check_success(l, init_loss):
+					break
+		return pertb, nimgs
 
 if __name__ == '__main__':
 	sess = tf.InteractiveSession()
@@ -453,7 +451,7 @@ if __name__ == '__main__':
 	attacker = Daedalus(sess, ORACLE)
 	path = SAVE_PATH+'{0} confidence'.format(CONFIDENCE)
 	try:
-		perturbation, perturbed_images = attacker.attack(X_test, epochs=10)
+		perturbation, perturbed_images = attacker.attack(X_test, epochs=20)
 		if not os.path.exists(path):
 			os.makedirs(path)
 		io.imsave(path+'/Physical perturbation.png', perturbation)
