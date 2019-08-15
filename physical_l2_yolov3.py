@@ -1,7 +1,7 @@
 import os
 import sys
 # supress tensorflow logging other than errors
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 sys.path.insert(0, '..')
 
 from keras import backend as K
@@ -28,14 +28,14 @@ import time
 from tqdm import tqdm
 
 # Parameter settings:
-GPU_ID = 1							# which gpu to used
+GPU_ID = 0							# which gpu to used
 EOT_NUM = 10
 CONFIDENCE = 0.3					# the confidence of attack
 EXAMPLE_NUM = 10					# total number of adversarial example to generate.
 BATCH_SIZE = 1						# number of adversarial example generated in each batch
 
 BINARY_SEARCH_STEPS = 5     		# number of times to adjust the constsant with binary search
-INITIAL_consts = 1e1	        	# the initial constsant c to pick as a first guess
+INITIAL_consts = 1		        	# the initial constsant c to pick as a first guess
 CLASS_NUM = 80						# 80 for COCO dataset
 MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
@@ -372,11 +372,11 @@ class Daedalus:
 			print('self.f3', self.f3)
 
 			# add two loss terms together
-			self.loss_adv = self.loss1_1_x + self.f3
-			self.loss1 = tf.reduce_mean(self.consts * self.loss_adv)
-			self.loss2 = tf.reduce_mean(self.l2dist)
-			self.loss = self.loss1 + self.loss2
-			print(self.loss_adv, self.loss1, self.loss2, self.loss)
+			self.loss_adv = self.loss1_1_x + self.consts * self.f3
+			self.loss1 = tf.reduce_mean(self.loss_adv)
+			#self.loss2 = tf.reduce_mean(self.l2dist)
+			self.loss = self.loss1# + self.loss2
+		
 		# Setup the adam optimizer and keep track of variables we're creating
 		start_vars = set(x.name for x in tf.global_variables())
 		optimizer = tf.train.AdamOptimizer(self.LEARNING_RATE)
@@ -443,7 +443,7 @@ class Daedalus:
 				init_loss = sess.run(self.loss)
 				init_adv_losses = sess.run(self.loss_adv)
 				prev = init_loss * 1.5
-				for iteration in tqdm(range(self.MAX_ITERATIONS)):
+				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
 					_, l, l2s, l1s, nimgs, c, pertb = self.sess.run([self.train, self.loss, self.l2dist, self.loss_adv, self.newimgs, self.consts, self.perturbation])
 					# print out the losses every 10%
@@ -461,7 +461,7 @@ class Daedalus:
 						prev = l
 					# update the best result found so far
 					for e, (l1, l2, ii) in enumerate(zip(l1s, l2s, pertb)):
-						print(l2, bestl2[e], l1, init_adv_losses[e])
+						#print(l2, bestl2[e], l1, init_adv_losses[e])
 						if l2 < bestl2[e] and check_success(l1, init_adv_losses[e]):
 							bestl2[e] = l2
 							bestloss[e] = l1
@@ -480,7 +480,6 @@ class Daedalus:
 					else:
 						# failure, either multiply by 10 if no solution found yet
 						#          or do binary search with the known upper bound
-						self.sess.run(self.reset_perturbation)
 						lower_bound[e] = max(lower_bound[e], consts[e])
 						if upper_bound[e] < 1e9:
 							consts[e] = (lower_bound[e] + upper_bound[e]) / 2
@@ -520,7 +519,7 @@ if __name__ == '__main__':
 	sess.run(init)
 	ORACLE = YOLO(0.6, 0.5)  # The auguments do not matter.
 	X_test = []
-	for (root, dirs, files) in os.walk('../COCO/val2017/val2017/'):
+	for (root, dirs, files) in os.walk('../datasets/COCO/val2017/val2017/'):
 		if files:
 			for f in files:
 				print(f)
