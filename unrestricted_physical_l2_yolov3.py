@@ -396,6 +396,9 @@ class Daedalus:
 		o_bestattack = [np.zeros(imgs[0].shape)] * batch_size
 		self.sess.run(self.reset_perturbation)
 
+		# start gradient descent attack
+		init_loss = sess.run(self.reduced_loss)
+		prev = init_loss * 1.2
 		for epoch in range(epochs):
 			for batch_ind in range(int(imgs.shape[0]/batch_size)):
 				start = batch_size * batch_ind
@@ -408,9 +411,6 @@ class Daedalus:
 				# set the variables so that we don't have to send them over again.
 				self.sess.run(self.setup, {self.assign_timgs: x_batch})
 
-				# start gradient descent attack
-				init_loss = sess.run(self.reduced_loss)
-				prev = init_loss * 1.2
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
 					_, l, distortion, l1s, nimgs, pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation])
@@ -456,7 +456,7 @@ if __name__ == '__main__':
 		if not os.path.exists(path):
 			os.makedirs(path)
 		io.imsave(path+'/Physical perturbation.png', perturbation)
-		np.save(path+'/perturbed_images.npy', perturbed_images)	
+		np.save(path+'/perturbed_images.npy', perturbed_images)
 	except:
 		print('Perturbation not found.')
 	path = SAVE_PATH+'{0} confidence'.format(self.confidence)
