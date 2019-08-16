@@ -306,29 +306,30 @@ class Daedalus:
 
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
-			self.perturbation = tf.Variable(np.zeros((pert_shape[0],
-											       	  pert_shape[1],
-											       	  pert_shape[2])), dtype=tf.float32, name='perturbation')
+			perturbation = tf.Variable(np.zeros((pert_shape[0],
+									       	     pert_shape[1],
+									       	     pert_shape[2])), dtype=tf.float32, name='perturbation')
 
 			# tf variables to sending data to tf:
 			self.timgs = tf.Variable(np.zeros((batch_size,
 											   img_shape[0],
 											   img_shape[1],
 											   img_shape[2])), dtype=tf.float32, name='self.timgs')
-			duplicated_perts = tf.stack([self.perturbation]*batch_size)
-			transformed_pertbations = tf.map_fn(transform_perturbation, (duplicated_perts, self.timgs), dtype=tf.float32)
-			print('transformed_pertbations', transformed_pertbations)
 			# and here's what we use to assign them:
 			self.assign_timgs = tf.placeholder(tf.float32, (batch_size,
 															img_shape[0],
 															img_shape[1],
 															img_shape[2]))
-
+			
 			# Tensor operation: the resulting image, tanh'd to keep bounded from
 			# boxmin to boxmax:
 			self.boxmul = (boxmax - boxmin) / 2.
 			self.boxplus = (boxmin + boxmax) / 2.
-			self.newimgs = tf.tanh(transformed_pertbations + self.timgs) * self.boxmul + self.boxplus
+			self.perturbation = tf.tanh(perturbation)* self.boxmul + self.boxplus
+			duplicated_perts = tf.stack([self.perturbation]*batch_size)
+			transformed_pertbations = tf.map_fn(transform_perturbation, (duplicated_perts, self.timgs), dtype=tf.float32)
+			
+			self.newimgs = tf.where(tf.equal(transformed_pertbations, 0), tf.tanh(self.timgs)*self.boxmul+self.boxplus, transformed_pertbations)
 
 			# Get prediction from the model:
 			outs = self.yolo_model._yolo(self.newimgs)
@@ -364,7 +365,7 @@ class Daedalus:
 		# Setup the adam optimizer and keep track of variables we're creating
 		start_vars = set(x.name for x in tf.global_variables())
 		optimizer = tf.train.AdamOptimizer(self.LEARNING_RATE)
-		self.train = optimizer.minimize(self.reduced_loss, var_list=[self.perturbation])
+		self.train = optimizer.minimize(self.reduced_loss, var_list=[perturbation])
 		end_vars = tf.global_variables()
 		new_vars = [x for x in end_vars if x.name not in start_vars]
 		print('new_vars', new_vars)
