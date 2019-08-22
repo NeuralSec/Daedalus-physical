@@ -24,6 +24,7 @@ from YOLOv3.model.yolo_model import YOLO
 import cv2
 import matplotlib.pyplot as plt
 from skimage import io
+import utils
 import time
 from tqdm import tqdm
 
@@ -42,24 +43,6 @@ PERT_SHAPE = (100, 100, 3)
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = '{0}'.format(GPU_ID)
-
-
-def process_image(img):
-	"""
-	Resize, reduce and expand image.
-	# Argument:
-		img: original image.
-
-	# Returns
-		image: ndarray(64, 64, 3), processed image.
-	"""
-	image = cv2.resize(img, (416, 416),
-					   interpolation=cv2.INTER_CUBIC)
-	image = np.array(image, dtype='float32')
-	image /= 255.
-	image = np.expand_dims(image, axis=0)
-	return image
-
 
 def process_yolo_output(out, anchors, mask):
 	"""
@@ -424,20 +407,9 @@ if __name__ == '__main__':
 	init = tf.global_variables_initializer()
 	sess.run(init)
 	ORACLE = YOLO(0.6, 0.5)  # The auguments do not matter.
-	X_test = []
-	for (root, dirs, files) in os.walk('../datasets/COCO/val2017/val2017/'):
-		if files:
-			for f in files:
-				print(f)
-				path = os.path.join(root, f)
-				image = cv2.imread(path)
-				image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # RGB
-				image = process_image(image)
-				X_test.append(image)
-				EXAMPLE_NUM -= 1
-				if EXAMPLE_NUM == 0:
-					break
-	X_test = np.concatenate(X_test, axis=0)
+	
+	print("start video")
+	X_test = utils.vid2imgs('../datasets/videos/IMG_4582.MOV')
 	print('X_test shape:', X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
 	path = SAVE_PATH+'{0} confidence'.format(CONFIDENCE)
