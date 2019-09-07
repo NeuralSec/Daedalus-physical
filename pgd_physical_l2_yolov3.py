@@ -39,7 +39,7 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (200, 200, 3)
+PERT_SHAPE = (100, 100, 3)
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = '{0}'.format(GPU_ID)
@@ -274,9 +274,10 @@ class Daedalus:
 				with tf.name_scope('shift'):
 					W = tf.shape(img)[-2]
 					perturb_size = tf.shape(pert)[-2]
+					window = tf.cast((W-perturb_size)/10, tf.int32)
 					# set positions of the perturbation according to a uniform distribution
-					left = tf.random.uniform((), 0, 0.1*(W-perturb_size), dtype=tf.int32)
-					top = tf.random.uniform((), 0, 0.1*(W-perturb_size), dtype=tf.int32)
+					left = tf.random.uniform((), 0, window, dtype=tf.int32)
+					top = tf.random.uniform((), 0, window, dtype=tf.int32)
 					right = left + perturb_size
 					bottom = top + perturb_size
 					pads = tf.stack([tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
@@ -388,7 +389,7 @@ class Daedalus:
 					# perform the attack on a single example
 					_, l, distortion, l1s, nimgs, clipped_pgd_pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation])
 					# print out the losses every 10%
-					if iteration % (self.MAX_ITERATIONS // 10) == 0:
+					if iteration % (self.MAX_ITERATIONS // 100) == 0:
 						print('\n===iteration:', iteration, '===')
 						print('\nThe attacked box number is:', sess.run(self.bw).shape)
 						print('\nThe loss values of box confidence and dimension are:', sess.run([self.boxconf_losses, self.f3]))
