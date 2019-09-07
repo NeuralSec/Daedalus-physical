@@ -32,7 +32,7 @@ from tqdm import tqdm
 GPU_ID = 0							# which gpu to used
 CONFIDENCE = 0.1					# the confidence of attack
 EXAMPLE_NUM = 100					# total number of adversarial example to generate.
-BATCH_SIZE = 2						# number of adversarial example generated in each batch
+BATCH_SIZE = 10						# number of adversarial example generated in each batch
 
 CLASS_NUM = 80						# 80 for COCO dataset
 MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
@@ -265,7 +265,7 @@ class Daedalus:
 					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
 
 			def apply_noise(pert):
-				return tf.clip_by_value(pert + tf.random.normal(tf.shape(pert)), 0, 1)
+				return tf.clip_by_value(pert + 0.001*tf.random.normal(tf.shape(pert)), 0, 1)
 
 			def pad_n_shift(pert, img):
 				'''
@@ -275,8 +275,8 @@ class Daedalus:
 					W = tf.shape(img)[-2]
 					perturb_size = tf.shape(pert)[-2]
 					# set positions of the perturbation according to a uniform distribution
-					left = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int32)
-					top = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int32)
+					left = tf.random.uniform((), 0, 0.1*(W-perturb_size), dtype=tf.int32)
+					top = tf.random.uniform((), 0, 0.1*(W-perturb_size), dtype=tf.int32)
 					right = left + perturb_size
 					bottom = top + perturb_size
 					pads = tf.stack([tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
@@ -360,7 +360,8 @@ class Daedalus:
 		self.setup = []
 		self.setup.append(self.timgs.assign(self.assign_timgs))
 		self.init = tf.global_variables_initializer()
-	
+		self.sess.run(self.init)
+
 	def attack(self, imgs, epochs=20):
 		"""
 		Run the attack on a batch of images and labels.
@@ -373,7 +374,6 @@ class Daedalus:
 			return loss <= init_loss * (1 - self.confidence)
 		
 		batch_size = self.batch_size
-		self.sess.run(self.init)
 		for batch_ind in range(int(imgs.shape[0]/batch_size)):
 			start = batch_size * batch_ind
 			end = start + batch_size
@@ -386,7 +386,7 @@ class Daedalus:
 			for epoch in range(epochs):
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
-					_, l, distortion, l1s, nimgs, clipped_pgd_pertb, pgd_pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation, perturbation])
+					_, l, distortion, l1s, nimgs, clipped_pgd_pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation])
 					# print out the losses every 10%
 					if iteration % (self.MAX_ITERATIONS // 10) == 0:
 						print('\n===iteration:', iteration, '===')
@@ -394,7 +394,8 @@ class Daedalus:
 						print('\nThe loss values of box confidence and dimension are:', sess.run([self.boxconf_losses, self.f3]))
 						print('\nThe adversarial losses for each example are:', l1s)
 						print('\nThe distortions of the perturbation is:', distortion)
-
+						io.imsave(f'debug/epoch{epoch}-iter{iteration}-PGD perturbation.png', clipped_pgd_pertb)
+						[io.imsave(f'debug/epoch{epoch}-iter{iteration}-PGD example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
 					# check if we should abort search if we're getting nowhere.
 					if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
 						if l > prev * .9999:
@@ -402,23 +403,22 @@ class Daedalus:
 						prev = l
 				if check_success(l, init_loss):
 					break
-		return clipped_pgd_pertb, pgd_pertb, nimgs
+		return clipped_pgd_pertb, nimgs
 
 if __name__ == '__main__':
 	sess = tf.InteractiveSession()
 	ORACLE = YOLO(0.6, 0.5)  # The auguments do not matter.
 	
 	print("start video")
-	X_test = utils.vid2imgs('../datasets/videos/IMG_4582.MOV')
+	X_test = utils.vid2imgs('../datasets/videos/samples.MOV')
 	print('X_test shape:', X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
 	path = SAVE_PATH+'{0} confidence'.format(CONFIDENCE)
 	if not os.path.exists(path):
 		os.makedirs(path)
 	try:
-		clipped_perturbation, perturbation, perturbed_images = attacker.attack(X_test, epochs=20)
+		clipped_perturbation, perturbed_images = attacker.attack(X_test, epochs=20)
 		io.imsave(path+'/Clipped PGD Physical perturbation.png', clipped_perturbation)
-		io.imsave(path+'/PGD Physical perturbation tanh.png', perturbation)
 		np.save(path+'/perturbed_images.npy', perturbed_images)
 	except:
 		print('Perturbation not found.')

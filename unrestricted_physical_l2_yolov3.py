@@ -410,7 +410,7 @@ if __name__ == '__main__':
 	ORACLE = YOLO(0.6, 0.5)  # The auguments do not matter.
 	
 	print("start video")
-	X_test = utils.vid2imgs('../datasets/videos/IMG_4582.MOV')
+	X_test = utils.vid2imgs('../datasets/videos/samples.MOV')
 	print('X_test shape:', X_test.shape)
 	attacker = Daedalus(sess, ORACLE)
 	path = SAVE_PATH+'{0} confidence'.format(CONFIDENCE)
