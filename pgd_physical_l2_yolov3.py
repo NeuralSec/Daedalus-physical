@@ -265,7 +265,7 @@ class Daedalus:
 					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
 
 			def apply_noise(pert):
-				return pert + tf.random.normal(tf.shape(pert))
+				return tf.clip_by_value(pert + tf.random.normal(tf.shape(pert)), 0, 1)
 
 			def pad_n_shift(pert, img):
 				'''
@@ -311,11 +311,11 @@ class Daedalus:
 			# boxmin to boxmax:
 			self.boxmul = (boxmax - boxmin) / 2.
 			self.boxplus = (boxmin + boxmax) / 2.
-			self.perturbation = tf.tanh(perturbation)* self.boxmul + self.boxplus
+			self.perturbation = tf.clip_by_value(perturbation, 0, 1)
 			duplicated_perts = tf.stack([self.perturbation]*batch_size)
 			transformed_pertbations = tf.map_fn(transform_perturbation, (duplicated_perts, self.timgs), dtype=tf.float32)
 			
-			self.newimgs = tf.where(tf.equal(transformed_pertbations, 0), tf.tanh(self.timgs)*self.boxmul+self.boxplus, transformed_pertbations)
+			self.newimgs = tf.clip_by_value(tf.where(tf.equal(transformed_pertbations, 0), self.timgs, transformed_pertbations), 0, 1)
 
 			# Get prediction from the model:
 			outs = self.yolo_model._yolo(self.newimgs)
