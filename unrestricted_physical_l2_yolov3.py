@@ -30,16 +30,16 @@ from tqdm import tqdm
 
 # Parameter settings:
 GPU_ID = 0							# which gpu to used
-CONFIDENCE = 0.3					# the confidence of attack
+CONFIDENCE = 0.1					# the confidence of attack
 EXAMPLE_NUM = 100					# total number of adversarial example to generate.
-BATCH_SIZE = 10						# number of adversarial example generated in each batch
+BATCH_SIZE = 2						# number of adversarial example generated in each batch
 
 CLASS_NUM = 80						# 80 for COCO dataset
 MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (100, 100, 3)
+PERT_SHAPE = (200, 200, 3)
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = '{0}'.format(GPU_ID)
@@ -252,7 +252,7 @@ class Daedalus:
 				with tf.name_scope('scale'):
 					W = tf.cast(tf.shape(img)[-2], tf.float32)
 					perturb_size = tf.cast(tf.shape(pert)[-2], tf.float32)
-					newscale = tf.random.uniform((), tf.minimum(0.9*perturb_size, W), tf.minimum(1.1*perturb_size, W))
+					newscale = tf.random.uniform((), tf.minimum(0.8*perturb_size, W), tf.minimum(1.2*perturb_size, W))
 					_to_size = tf.cast(newscale, tf.int32)
 					return tf.image.resize_images(pert, [_to_size, _to_size])
 
@@ -263,6 +263,9 @@ class Daedalus:
 				with tf.name_scope('rotate'):
 					angles = np.pi * tf.random.uniform((), -0.1, 0.1)
 					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
+
+			def apply_noise(pert):
+				return pert + tf.random.normal(tf.shape(pert))
 
 			def pad_n_shift(pert, img):
 				'''
@@ -281,7 +284,7 @@ class Daedalus:
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
-				transformed_pert = rotates(scale(pert, img))
+				transformed_pert = apply_noise(rotates(scale(pert, img)))
 				return pad_n_shift(transformed_pert, img)
 
 		def NPS(imgs):
@@ -357,7 +360,8 @@ class Daedalus:
 		self.setup = []
 		self.setup.append(self.timgs.assign(self.assign_timgs))
 		self.init = tf.global_variables_initializer()
-	
+		self.sess.run(self.init)
+		
 	def attack(self, imgs, epochs=20):
 		"""
 		Run the attack on a batch of images and labels.
@@ -371,7 +375,6 @@ class Daedalus:
 		batch_size = self.batch_size
 		# convert images to arctanh-space
 		imgs = np.arctanh((imgs - self.boxplus) / self.boxmul * 0.999999)
-		self.sess.run(self.init)
 		for batch_ind in range(int(imgs.shape[0]/batch_size)):
 			start = batch_size * batch_ind
 			end = start + batch_size
@@ -384,7 +387,7 @@ class Daedalus:
 			for epoch in range(epochs):
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
-					_, l, distortion, l1s, nimgs, pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation])
+					_, l, distortion, l1s, nimgs, pertb_tanh, pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation, perturbation])
 					# print out the losses every 10%
 					if iteration % (self.MAX_ITERATIONS // 10) == 0:
 						print('\n===iteration:', iteration, '===')
@@ -400,12 +403,10 @@ class Daedalus:
 						prev = l
 				if check_success(l, init_loss):
 					break
-		return pertb, nimgs
+		return pertb, pertb_tanh, nimgs
 
 if __name__ == '__main__':
 	sess = tf.InteractiveSession()
-	init = tf.global_variables_initializer()
-	sess.run(init)
 	ORACLE = YOLO(0.6, 0.5)  # The auguments do not matter.
 	
 	print("start video")
@@ -416,8 +417,9 @@ if __name__ == '__main__':
 	if not os.path.exists(path):
 		os.makedirs(path)
 	try:
-		perturbation, perturbed_images = attacker.attack(X_test, epochs=20)
+		perturbation, perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=20)
 		io.imsave(path+'/Physical perturbation.png', perturbation)
+		io.imsave(path+'/Physical perturbation tanh.png', perturbation_tanh)
 		np.save(path+'/perturbed_images.npy', perturbed_images)
 	except:
 		print('Perturbation not found.')
