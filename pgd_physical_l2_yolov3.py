@@ -371,9 +371,8 @@ class Daedalus:
 			Check if the initial loss value has been reduced by 'self.confidence' percent
 			"""
 			return loss <= init_loss * (1 - self.confidence)
+		
 		batch_size = self.batch_size
-		# convert images to arctanh-space
-		imgs = np.arctanh((imgs - self.boxplus) / self.boxmul * 0.999999)
 		self.sess.run(self.init)
 		for batch_ind in range(int(imgs.shape[0]/batch_size)):
 			start = batch_size * batch_ind
@@ -387,7 +386,7 @@ class Daedalus:
 			for epoch in range(epochs):
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
-					_, l, distortion, l1s, nimgs, pertb_tanh, pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation, perturbation])
+					_, l, distortion, l1s, nimgs, clipped_pgd_pertb, pgd_pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation, perturbation])
 					# print out the losses every 10%
 					if iteration % (self.MAX_ITERATIONS // 10) == 0:
 						print('\n===iteration:', iteration, '===')
@@ -403,7 +402,7 @@ class Daedalus:
 						prev = l
 				if check_success(l, init_loss):
 					break
-		return pertb, pertb_tanh, nimgs
+		return clipped_pgd_pertb, pgd_pertb, nimgs
 
 if __name__ == '__main__':
 	sess = tf.InteractiveSession()
@@ -417,9 +416,9 @@ if __name__ == '__main__':
 	if not os.path.exists(path):
 		os.makedirs(path)
 	try:
-		perturbation, perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=20)
-		io.imsave(path+'/Physical perturbation.png', perturbation)
-		io.imsave(path+'/Physical perturbation tanh.png', perturbation_tanh)
+		clipped_perturbation, perturbation, perturbed_images = attacker.attack(X_test, epochs=20)
+		io.imsave(path+'/Clipped PGD Physical perturbation.png', clipped_perturbation)
+		io.imsave(path+'/PGD Physical perturbation tanh.png', perturbation)
 		np.save(path+'/perturbed_images.npy', perturbed_images)
 	except:
 		print('Perturbation not found.')
