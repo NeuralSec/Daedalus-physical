@@ -389,13 +389,15 @@ class Daedalus:
 					# perform the attack on a single example
 					_, l, distortion, l1s, nimgs, pertb_tanh, pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation, perturbation])
 					# print out the losses every 10%
-					if iteration % (self.MAX_ITERATIONS // 10) == 0:
+					if iteration % (self.MAX_ITERATIONS // 100) == 0:
 						print('\n===iteration:', iteration, '===')
 						print('\nThe attacked box number is:', sess.run(self.bw).shape)
 						print('\nThe loss values of box confidence and dimension are:', sess.run([self.boxconf_losses, self.f3]))
 						print('\nThe adversarial losses for each example are:', l1s)
 						print('\nThe distortions of the perturbation is:', distortion)
-
+						io.imsave(f'debug/epoch{epoch}-iter{iteration}-cw perturbation.png', pertb)
+						io.imsave(f'debug/epoch{epoch}-iter{iteration}-cw tanh perturbation.png', pertb_tanh)
+						[io.imsave(f'debug/epoch{epoch}-iter{iteration}-cw example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
 					# check if we should abort search if we're getting nowhere.
 					if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
 						if l > prev * .9999:
@@ -418,9 +420,9 @@ if __name__ == '__main__':
 		os.makedirs(path)
 	try:
 		perturbation, perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=20)
-		io.imsave(path+'/Physical perturbation.png', perturbation)
-		io.imsave(path+'/Physical perturbation tanh.png', perturbation_tanh)
-		np.save(path+'/perturbed_images.npy', perturbed_images)
+		io.imsave(path+'/cw perturbation.png', perturbation)
+		io.imsave(path+'/cw perturbation tanh.png', perturbation_tanh)
+		np.save(path+'/cw_images.npy', perturbed_images)
 	except:
 		print('Perturbation not found.')
 	writer = tf.summary.FileWriter("log", sess.graph)
