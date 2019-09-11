@@ -39,7 +39,7 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (200, 200, 3)
+PERT_SHAPE = (100, 100, 3)
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = '{0}'.format(GPU_ID)
@@ -265,8 +265,8 @@ class Daedalus:
 					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
 
 			def apply_noise(pert):
-				return pert + tf.random.normal(tf.shape(pert))
-
+				return tf.clip_by_value(pert + 0.001*tf.random.normal(tf.shape(pert)), 0, 1)
+				
 			def pad_n_shift(pert, img):
 				'''
 				Shift and pad perturbation into img size
@@ -274,9 +274,11 @@ class Daedalus:
 				with tf.name_scope('shift'):
 					W = tf.shape(img)[-2]
 					perturb_size = tf.shape(pert)[-2]
+					window_left = tf.cast((W-perturb_size)/10, tf.int32)
+					window_right = tf.cast((W-perturb_size)/5, tf.int32)
 					# set positions of the perturbation according to a uniform distribution
-					left = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int32)
-					top = tf.random.uniform((), 0, W-perturb_size, dtype=tf.int32)
+					left = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
+					top = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
 					right = left + perturb_size
 					bottom = top + perturb_size
 					pads = tf.stack([tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
@@ -387,7 +389,7 @@ class Daedalus:
 			for epoch in range(epochs):
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
-					_, l, distortion, l1s, nimgs, pertb_tanh, pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation, perturbation])
+					_, l, distortion, l1s, nimgs, pertb_tanh = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation])
 					# print out the losses every 10%
 					if iteration % (self.MAX_ITERATIONS // 100) == 0:
 						print('\n===iteration:', iteration, '===')
@@ -395,7 +397,6 @@ class Daedalus:
 						print('\nThe loss values of box confidence and dimension are:', sess.run([self.boxconf_losses, self.f3]))
 						print('\nThe adversarial losses for each example are:', l1s)
 						print('\nThe distortions of the perturbation is:', distortion)
-						io.imsave(f'debug/epoch{epoch}-iter{iteration}-cw perturbation.png', pertb)
 						io.imsave(f'debug/epoch{epoch}-iter{iteration}-cw tanh perturbation.png', pertb_tanh)
 						[io.imsave(f'debug/epoch{epoch}-iter{iteration}-cw example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
 					# check if we should abort search if we're getting nowhere.
@@ -405,7 +406,7 @@ class Daedalus:
 						prev = l
 				if check_success(l, init_loss):
 					break
-		return pertb, pertb_tanh, nimgs
+		return pertb_tanh, nimgs
 
 if __name__ == '__main__':
 	sess = tf.InteractiveSession()
@@ -419,8 +420,7 @@ if __name__ == '__main__':
 	if not os.path.exists(path):
 		os.makedirs(path)
 	try:
-		perturbation, perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=20)
-		io.imsave(path+'/cw perturbation.png', perturbation)
+		perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=20)
 		io.imsave(path+'/cw perturbation tanh.png', perturbation_tanh)
 		np.save(path+'/cw_images.npy', perturbed_images)
 	except:

@@ -39,7 +39,7 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (100, 100, 3)
+PERT_SHAPE = (150, 150, 3)
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = '{0}'.format(GPU_ID)
@@ -261,11 +261,11 @@ class Daedalus:
 				Rotate masks
 				'''
 				with tf.name_scope('rotate'):
-					angles = np.pi * tf.random.uniform((), -0.1, 0.1)
+					angles = np.pi * tf.random.uniform((), -0.05, 0.05)
 					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
 
 			def apply_noise(pert):
-				return tf.clip_by_value(pert + 0.001*tf.random.normal(tf.shape(pert)), 0, 1)
+				return tf.clip_by_value(pert + 0.005*tf.random.normal(tf.shape(pert)), 0, 1)
 
 			def pad_n_shift(pert, img):
 				'''
@@ -274,10 +274,11 @@ class Daedalus:
 				with tf.name_scope('shift'):
 					W = tf.shape(img)[-2]
 					perturb_size = tf.shape(pert)[-2]
-					window = tf.cast((W-perturb_size)/10, tf.int32)
+					window_left = tf.cast((W-perturb_size)/10, tf.int32)
+					window_right = tf.cast((W-perturb_size)/5, tf.int32)
 					# set positions of the perturbation according to a uniform distribution
-					left = tf.random.uniform((), 0, window, dtype=tf.int32)
-					top = tf.random.uniform((), 0, window, dtype=tf.int32)
+					left = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
+					top = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
 					right = left + perturb_size
 					bottom = top + perturb_size
 					pads = tf.stack([tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
@@ -294,8 +295,8 @@ class Daedalus:
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
 			perturbation = tf.Variable(np.zeros((pert_shape[0],
-									       	     pert_shape[1],
-									       	     pert_shape[2])), dtype=tf.float32, name='perturbation')
+										       	 pert_shape[1],
+										       	 pert_shape[2])), dtype=tf.float32, name='perturbation')
 
 			# tf variables to sending data to tf:
 			self.timgs = tf.Variable(np.zeros((batch_size,
@@ -375,16 +376,17 @@ class Daedalus:
 			return loss <= init_loss * (1 - self.confidence)
 		
 		batch_size = self.batch_size
-		for batch_ind in range(int(imgs.shape[0]/batch_size)):
-			start = batch_size * batch_ind
-			end = start + batch_size
-			x_batch = imgs[start:end]
+		for epoch in range(epochs):
+			for batch_ind in range(int(imgs.shape[0]/batch_size)):
+				start = batch_size * batch_ind
+				end = start + batch_size
+				x_batch = imgs[start:end]
 
-			# set input images.
-			self.sess.run(self.setup, {self.assign_timgs: x_batch})
-			init_loss = sess.run(self.reduced_loss)
-			prev = init_loss * 1.2
-			for epoch in range(epochs):
+				# set input images.
+				self.sess.run(self.setup, {self.assign_timgs: x_batch})
+				init_loss = sess.run(self.reduced_loss)
+				prev = init_loss * 1.2
+			
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
 					_, l, distortion, l1s, nimgs, clipped_pgd_pertb = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation])
@@ -418,7 +420,7 @@ if __name__ == '__main__':
 	if not os.path.exists(path):
 		os.makedirs(path)
 	try:
-		clipped_perturbation, perturbed_images = attacker.attack(X_test, epochs=20)
+		clipped_perturbation, perturbed_images = attacker.attack(X_test, epochs=50)
 		io.imsave(path+'/Clipped PGD Physical perturbation.png', clipped_perturbation)
 		np.save(path+'/perturbed_images.npy', perturbed_images)
 	except:
