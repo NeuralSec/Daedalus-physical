@@ -361,14 +361,13 @@ class Daedalus:
 		# these are the variables to initialize when we run
 		self.setup = []
 		self.setup.append(self.timgs.assign(self.assign_timgs))
-		self.init = tf.global_variables_initializer()
-		self.sess.run(self.init)
-
+		self.init = tf.variables_initializer(var_list=[perturbation]+new_vars)
+		
 	def attack(self, imgs, epochs=20):
 		"""
 		Run the attack on a batch of images and labels.
 		"""
-
+		self.sess.run(self.init)
 		def check_success(loss, init_loss):
 			"""
 			Check if the initial loss value has been reduced by 'self.confidence' percent

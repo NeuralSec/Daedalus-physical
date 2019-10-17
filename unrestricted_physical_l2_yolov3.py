@@ -361,14 +361,13 @@ class Daedalus:
 		# these are the variables to initialize when we run
 		self.setup = []
 		self.setup.append(self.timgs.assign(self.assign_timgs))
-		self.init = tf.global_variables_initializer()
-		self.sess.run(self.init)
+		self.init = tf.variables_initializer(var_list=[perturbation]+new_vars)
 		
 	def attack(self, imgs, epochs=20):
 		"""
 		Run the attack on a batch of images and labels.
 		"""
-
+		self.sess.run(self.init)
 		def check_success(loss, init_loss):
 			"""
 			Check if the initial loss value has been reduced by 'self.confidence' percent
@@ -410,8 +409,9 @@ class Daedalus:
 
 if __name__ == '__main__':
 	sess = tf.InteractiveSession()
+	K.set_session(sess)
+
 	ORACLE = YOLO(0.6, 0.5)  # The auguments do not matter.
-	
 	print("start video")
 	X_test = utils.vid2imgs('../datasets/videos/samples.MOV')
 	print('X_test shape:', X_test.shape)
@@ -419,11 +419,11 @@ if __name__ == '__main__':
 	path = SAVE_PATH+'{0} confidence'.format(CONFIDENCE)
 	if not os.path.exists(path):
 		os.makedirs(path)
-	try:
-		perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=20)
-		io.imsave(path+'/cw perturbation tanh.png', perturbation_tanh)
-		np.save(path+'/cw_images.npy', perturbed_images)
-	except:
-		print('Perturbation not found.')
+	#try:
+	perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=20)
+	io.imsave(path+'/cw perturbation tanh.png', perturbation_tanh)
+	np.save(path+'/cw_images.npy', perturbed_images)
+	#except:
+	#	print('Perturbation not found.')
 	writer = tf.summary.FileWriter("log", sess.graph)
 	writer.close()
