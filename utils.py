@@ -22,9 +22,7 @@ def vid2imgs(name):
 	imgs = []
 	while(cap.isOpened()):
 		ret, frame = cap.read()
-		print(type(ret))
 		if not frame is None:
-			print(type(frame), frame.shape)
 			frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # RGB
 			imgs.append(process_image(frame))
 		else:

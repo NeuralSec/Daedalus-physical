@@ -306,7 +306,7 @@ class Daedalus:
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
-				pert = scale_pert(apply_noise(pert))
+				#pert = scale_pert(apply_noise(pert))
 				transformed_pert = rotates(zoom(pert, img))
 				return pad_n_shift(transformed_pert, img)
 
@@ -341,7 +341,7 @@ class Daedalus:
 
 			print('transformed_pertbations', transformed_pertbations)
 			print('newimgs', self.newimgs)
-			
+
 			# Get prediction from the model:
 			outs = self.yolo_model._yolo(self.newimgs)
 			# [(N, 13, 13, 3, 85), (N, 26, 26, 3, 85), (N, 52, 52, 3, 85)]
