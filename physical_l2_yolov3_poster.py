@@ -250,10 +250,11 @@ class Daedalus:
 			def scale_pert(pert):
 				# scale the hight-width ratio the perturbation to the 416x416 input
 				with tf.name_scope('scale'):
-					pert_shape = tf.shape(pert)
+					perturb_height = tf.cast(tf.shape(pert)[-2], tf.float32)
+					perturb_width = tf.cast(tf.shape(pert)[-1], tf.float32)
 					# height = 416, width = 234
-					_to_height = tf.cast(pert_shape[0]*zoom_ratio[0], tf.int32)
-					_to_width = tf.cast(pert_shape[1]*zoom_ratio[1], tf.int32)
+					_to_height = tf.cast(perturb_height*zoom_ratio[0], tf.int32)
+					_to_width = tf.cast(perturb_width*zoom_ratio[1], tf.int32)
 					return(tf.image.resize_images(images=pert, size=[_to_height, _to_width], name='scaling'))
 
 			def zoom(pert, img):
