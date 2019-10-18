@@ -40,7 +40,7 @@ ABORT_EARLY = True          		# if we stop improving, abort gradient descent ear
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
 PERT_SHAPE = (720, 480, 3)			# Perturbation shape in the real world
-
+ZOOM_RATIO = (int(416/1280), int(720/416))	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
 
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
@@ -228,7 +228,7 @@ class Daedalus:
 	"""
 	Daedalus adversarial example generator based on the Yolo v3 model.
 	"""
-	def __init__(self, sess, model, pert_shape=PERT_SHAPE, img_shape=IMAGE_SHAPE, batch_size=BATCH_SIZE, confidence=CONFIDENCE,
+	def __init__(self, sess, model, pert_shape=PERT_SHAPE, img_shape=IMAGE_SHAPE, zoom_ratio=ZOOM_RATIO, batch_size=BATCH_SIZE, confidence=CONFIDENCE,
 				 learning_rate=LEARNING_RATE, max_iterations=MAX_ITERATIONS, abort_early=ABORT_EARLY, boxmin=0, boxmax=1):
 		self.sess = sess
 		self.LEARNING_RATE = learning_rate
@@ -249,7 +249,9 @@ class Daedalus:
 			"""
 			def zoom_pert(pert):
 				# zoom perturbation to fit the 416x416 input scale
-				return(tf.image.resize_images(images=pert, size=[100,100], name='zooming'))
+				return(tf.image.resize_images(images=pert,
+											  size=[pert_shape[0]*zoom_ratio[0],pert_shape[1]*zoom_ratio[1]],
+											  name='zooming'))
 
 			def scale(pert, img):
 				'''
