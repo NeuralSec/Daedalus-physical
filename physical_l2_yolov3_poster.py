@@ -250,7 +250,8 @@ class Daedalus:
 
 			def apply_noise(pert):
 				# Apply noise to the perturbation
-				return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
+				with tf.name_scope('apply_noise'):
+					return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
 
 			def scale_pert(pert):
 				# scale the hight-width ratio the perturbation to the 416x416 input
