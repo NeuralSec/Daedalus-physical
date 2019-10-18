@@ -39,8 +39,8 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (720, 480, 3)			# Perturbation shape in the real world
-ZOOM_RATIO = (int(416/720), int(416/1280))	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
+PERT_SHAPE = (720, 720, 3)			# Perturbation shape in the real world
+ZOOM_RATIO = (416/720, 416/1280)	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
 
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
@@ -251,18 +251,23 @@ class Daedalus:
 				# scale the hight-width ratio the perturbation to the 416x416 input
 				with tf.name_scope('scale'):
 					pert_shape = tf.shape(pert)
-					return(tf.image.resize_images(images=pert,
-												  size=[pert_shape[0]*zoom_ratio[0], pert_shape[1]*zoom_ratio[1]],
-												  name='scaling'))
+					# height = 416, width = 234
+					_to_height = tf.cast(pert_shape[0]*zoom_ratio[0], tf.int32)
+					_to_width = tf.cast(pert_shape[1]*zoom_ratio[1], tf.int32)
+					return(tf.image.resize_images(images=pert, size=[_to_height, _to_width], name='scaling'))
 
 			def zoom(pert, img):
 				# Zoom the perturbation
 				with tf.name_scope('zoom'):
-					W = tf.cast(tf.shape(img)[-2], tf.float32)
-					perturb_size = tf.cast(tf.shape(pert)[-2], tf.float32)
-					newscale = tf.random.uniform((), tf.minimum(0.8*perturb_size, W), tf.minimum(1.2*perturb_size, W))
-					_to_size = tf.cast(newscale, tf.int32)
-					return tf.image.resize_images(pert, [_to_size, _to_size], name='zooming')
+					H = tf.cast(tf.shape(img)[-2], tf.float32)
+					W = tf.cast(tf.shape(img)[-1], tf.float32)
+					perturb_height = tf.cast(tf.shape(pert)[-2], tf.float32)
+					perturb_width = tf.cast(tf.shape(pert)[-1], tf.float32)
+					new_height = tf.random.uniform((), tf.minimum(0.2*perturb_height, H), tf.minimum(0.5*perturb_height, H))
+					new_width = tf.random.uniform((), tf.minimum(0.2*perturb_width, W), tf.minimum(0.5*perturb_width, W))
+					_to_height = tf.cast(new_height, tf.int32)
+					_to_width = tf.cast(new_width, tf.int32)
+					return tf.image.resize_images(pert, [_to_height, _to_width], name='zooming')
 
 			def rotates(pert):
 				# Rotate the perturbation
@@ -277,15 +282,22 @@ class Daedalus:
 			def pad_n_shift(pert, img):
 				# Shift and pad the perturbation into img size
 				with tf.name_scope('shift'):
-					W = tf.shape(img)[-2]
-					perturb_size = tf.shape(pert)[-2]
-					window_left = tf.cast((W-perturb_size)/10, tf.int32)
-					window_right = tf.cast((W-perturb_size)/5, tf.int32)
+					H = tf.shape(img)[-2]
+					W = tf.shape(img)[-1]
+					perturb_height = tf.shape(pert)[-2]
+					perturb_width = tf.shape(pert)[-1]
+					window_top_min = tf.cast((H-perturb_height)/10, tf.int32)
+					window_top_max = tf.cast((H-perturb_height)/5, tf.int32)
+					window_left_min = tf.cast((W-perturb_width)/10, tf.int32)
+					window_left_max = tf.cast((W-perturb_width)/5, tf.int32)
+					
 					# set positions of the perturbation according to a uniform distribution
-					left = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
-					top = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
-					right = left + perturb_size
-					bottom = top + perturb_size
+					top = tf.random.uniform((), window_top_min, window_top_max, dtype=tf.int32)
+					bottom = top + perturb_height
+
+					left = tf.random.uniform((), window_left_min, window_left_max, dtype=tf.int32)
+					right = left + perturb_width
+					
 					pads = tf.stack([tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
 					return tf.pad(pert, pads)
 
