@@ -39,7 +39,7 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (600, 400, 3)			# Perturbation shape in the real world
+PERT_SHAPE = (720, 480, 3)			# Perturbation shape in the real world
 ZOOM_RATIO = (int(416/720), int(416/1280))	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
 
 SAVE_PATH = 'physical_examples/'
@@ -247,60 +247,52 @@ class Daedalus:
 			Return:
 				# a transformed perturbation
 			"""
-			def zooming(pert, img):
-				'''
-				Scale masks
-				'''
-				with tf.name_scope('zooming'):
+			def scale_pert(pert):
+				# Scale the perturbation to fit the 416x416 input scale
+				with tf.name_scope('scale'):
+					pert_shape = tf.shape(pert)
+					return(tf.image.resize_images(images=pert,
+												  size=[pert_shape[0]*zoom_ratio[0], pert_shape[1]*zoom_ratio[1]],
+												  name='scaling'))
+
+			def zoom(pert, img):
+				# Zoom the perturbation
+				with tf.name_scope('scale'):
 					W = tf.cast(tf.shape(img)[-2], tf.float32)
 					perturb_size = tf.cast(tf.shape(pert)[-2], tf.float32)
 					newscale = tf.random.uniform((), tf.minimum(0.8*perturb_size, W), tf.minimum(1.2*perturb_size, W))
 					_to_size = tf.cast(newscale, tf.int32)
-					return tf.image.resize_images(pert, [_to_size, _to_size])
+					return tf.image.resize_images(pert, [_to_size, _to_size], name='zooming')
 
 			def rotates(pert):
-				'''
-				Rotate masks
-				'''
-				with tf.name_scope('rotating'):
+				# Rotate the perturbation
+				with tf.name_scope('rotate'):
 					angles = np.pi * tf.random.uniform((), -0.1, 0.1)
-					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
+					return tf.contrib.image.rotate(pert, angles, name='rotating')
 
 			def apply_noise(pert):
+				# Apply noise to the perturbation
 				return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
-			
-			def scale_pert(pert):
-				# zoom perturbation to fit the 416x416 input scale
-				with tf.name_scope('scaling'):
-					pert_shape = tf.shape(pert)
-					return(tf.image.resize_images(images=pert,
-												  size=[pert_shape[0]*zoom_ratio[0], pert_shape[1]*zoom_ratio[1]],
-												  name='scale'))
-
+				
 			def pad_n_shift(pert, img):
-				'''
-				Shift and pad perturbation into img size
-				'''
+				# Shift and pad the perturbation into img size
 				with tf.name_scope('shift'):
 					W = tf.shape(img)[-2]
-					perturb_H = tf.shape(pert)[-2]
-					perturb_W = tf.shape(pert)[-3]
-					window_left_min = tf.cast((W-perturb_W)/10, tf.int32)
-					window_left_max = tf.cast((W-perturb_W)/2, tf.int32)
-					window_top_min = tf.cast((W-perturb_H)/10, tf.int32)
-					window_top_max = tf.cast((W-perturb_H)/2, tf.int32)
-					
+					perturb_size = tf.shape(pert)[-2]
+					window_left = tf.cast((W-perturb_size)/10, tf.int32)
+					window_right = tf.cast((W-perturb_size)/5, tf.int32)
 					# set positions of the perturbation according to a uniform distribution
-					left = tf.random.uniform((), window_left_min, window_left_max, dtype=tf.int32)
-					top = tf.random.uniform((), window_top_min, window_top_max, dtype=tf.int32)
-					right = left + perturb_W
-					bottom = top + perturb_H
+					left = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
+					top = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
+					right = left + perturb_size
+					bottom = top + perturb_size
 					pads = tf.stack([tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
 					return tf.pad(pert, pads)
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
-				transformed_pert = scale_pert(apply_noise(rotates(zooming(pert, img))))
+				pert = scale_pert(pert)
+				transformed_pert = apply_noise(rotates(scale(pert, img)))
 				return pad_n_shift(transformed_pert, img)
 
 		def NPS(imgs):
