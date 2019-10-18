@@ -305,7 +305,7 @@ class Daedalus:
 					left = tf.random.uniform((), window_left_min, window_left_max, dtype=tf.int32)
 					right = left + perturb_width
 					
-					pads = tf.stack([tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
+					pads = tf.stack([tf.stack([top, H-bottom]),tf.stack([left, W-right]),[0,0]])
 					return tf.pad(pert, pads)
 
 			with tf.name_scope('generate_mask'):
@@ -341,9 +341,10 @@ class Daedalus:
 			self.perturbation = tf.tanh(perturbation)* self.boxmul + self.boxplus
 			duplicated_perts = tf.stack([self.perturbation]*batch_size)
 			transformed_pertbations = tf.map_fn(transform_perturbation, (duplicated_perts, self.timgs), dtype=tf.float32)
+			print('transformed_pertbations', transformed_pertbations)
+
 			self.newimgs = tf.where(tf.equal(transformed_pertbations, 0), tf.tanh(self.timgs)*self.boxmul+self.boxplus, transformed_pertbations)
 
-			print('transformed_pertbations', transformed_pertbations)
 			print('newimgs', self.newimgs)
 
 			# Get prediction from the model:
