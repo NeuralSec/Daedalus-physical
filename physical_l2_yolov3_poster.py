@@ -256,8 +256,8 @@ class Daedalus:
 			def scale_pert(pert):
 				# scale the hight-width ratio the perturbation to the 416x416 input
 				with tf.name_scope('scale'):
-					perturb_height = tf.cast(tf.shape(pert)[-2], tf.float32)
-					perturb_width = tf.cast(tf.shape(pert)[-1], tf.float32)
+					perturb_height = tf.cast(tf.shape(pert)[-3], tf.float32)
+					perturb_width = tf.cast(tf.shape(pert)[-2], tf.float32)
 					# height = 416, width = 234
 					_to_height = tf.cast(perturb_height*zoom_ratio[0], tf.int32)
 					_to_width = tf.cast(perturb_width*zoom_ratio[1], tf.int32)
@@ -266,10 +266,10 @@ class Daedalus:
 			def zoom(pert, img):
 				# Zoom the perturbation
 				with tf.name_scope('zoom'):
-					H = tf.cast(tf.shape(img)[-2], tf.float32)
-					W = tf.cast(tf.shape(img)[-1], tf.float32)
-					perturb_height = tf.cast(tf.shape(pert)[-2], tf.float32)
-					perturb_width = tf.cast(tf.shape(pert)[-1], tf.float32)
+					H = tf.cast(tf.shape(img)[-3], tf.float32)
+					W = tf.cast(tf.shape(img)[-2], tf.float32)
+					perturb_height = tf.cast(tf.shape(pert)[-3], tf.float32)
+					perturb_width = tf.cast(tf.shape(pert)[-2], tf.float32)
 					new_height = tf.random.uniform((), tf.minimum(0.2*perturb_height, H), tf.minimum(0.5*perturb_height, H))
 					new_width = tf.random.uniform((), tf.minimum(0.2*perturb_width, W), tf.minimum(0.5*perturb_width, W))
 					_to_height = tf.cast(new_height, tf.int32)
@@ -285,10 +285,10 @@ class Daedalus:
 			def pad_n_shift(pert, img):
 				# Shift and pad the perturbation into img size
 				with tf.name_scope('shift'):
-					H = tf.shape(img)[-2]
-					W = tf.shape(img)[-1]
-					perturb_height = tf.shape(pert)[-2]
-					perturb_width = tf.shape(pert)[-1]
+					H = tf.shape(img)[-3]
+					W = tf.shape(img)[-2]
+					perturb_height = tf.shape(pert)[-3]
+					perturb_width = tf.shape(pert)[-2]
 					window_top_min = tf.cast((H-perturb_height)/10, tf.int32)
 					window_top_max = tf.cast((H-perturb_height)/5, tf.int32)
 					window_left_min = tf.cast((W-perturb_width)/10, tf.int32)
@@ -306,7 +306,7 @@ class Daedalus:
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
-				#pert = scale_pert(apply_noise(pert))
+				pert = scale_pert(apply_noise(pert))
 				transformed_pert = rotates(zoom(pert, img))
 				return pad_n_shift(transformed_pert, img)
 
