@@ -248,7 +248,7 @@ class Daedalus:
 				# a transformed perturbation
 			"""
 			def scale_pert(pert):
-				# Scale the perturbation to fit the 416x416 input scale
+				# scale the hight-width ratio the perturbation to the 416x416 input
 				with tf.name_scope('scale'):
 					pert_shape = tf.shape(pert)
 					return(tf.image.resize_images(images=pert,
