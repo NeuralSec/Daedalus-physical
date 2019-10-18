@@ -39,7 +39,9 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (100, 100, 3)
+PERT_SHAPE = (720, 480, 3)			# Perturbation shape in the real world
+
+
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"] = '{0}'.format(GPU_ID)
@@ -245,6 +247,10 @@ class Daedalus:
 			Return:
 				# a transformed perturbation
 			"""
+			def zoom_pert(pert):
+				# zoom perturbation to fit the 416x416 input scale
+				return(tf.image.resize_images(images=pert, size=[100,100], name='zooming'))
+
 			def scale(pert, img):
 				'''
 				Scale masks
@@ -265,7 +271,7 @@ class Daedalus:
 					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
 
 			def apply_noise(pert):
-				return tf.clip_by_value(pert + 0.001*tf.random.normal(tf.shape(pert)), 0, 1)
+				return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
 				
 			def pad_n_shift(pert, img):
 				'''
@@ -286,6 +292,7 @@ class Daedalus:
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
+				pert = zoom_pert(pert)
 				transformed_pert = apply_noise(rotates(scale(pert, img)))
 				return pad_n_shift(transformed_pert, img)
 
