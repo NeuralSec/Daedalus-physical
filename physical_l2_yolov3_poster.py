@@ -257,7 +257,7 @@ class Daedalus:
 
 			def zoom(pert, img):
 				# Zoom the perturbation
-				with tf.name_scope('scale'):
+				with tf.name_scope('zoom'):
 					W = tf.cast(tf.shape(img)[-2], tf.float32)
 					perturb_size = tf.cast(tf.shape(pert)[-2], tf.float32)
 					newscale = tf.random.uniform((), tf.minimum(0.8*perturb_size, W), tf.minimum(1.2*perturb_size, W))
