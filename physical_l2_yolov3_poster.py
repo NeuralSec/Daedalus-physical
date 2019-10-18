@@ -281,14 +281,18 @@ class Daedalus:
 				'''
 				with tf.name_scope('shift'):
 					W = tf.shape(img)[-2]
-					perturb_size = tf.shape(pert)[-2]
-					window_left = tf.cast((W-perturb_size)/10, tf.int32)
-					window_right = tf.cast((W-perturb_size)/5, tf.int32)
+					perturb_H = tf.shape(pert)[-2]
+					perturb_W = tf.shape(pert)[-3]
+					window_left_min = tf.cast((W-perturb_W)/10, tf.int32)
+					window_left_max = tf.cast((W-perturb_W)/2, tf.int32)
+					window_top_min = tf.cast((W-perturb_H)/10, tf.int32)
+					window_top_max = tf.cast((W-perturb_H)/2, tf.int32)
+					
 					# set positions of the perturbation according to a uniform distribution
-					left = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
-					top = tf.random.uniform((), window_left, window_right, dtype=tf.int32)
-					right = left + perturb_size
-					bottom = top + perturb_size
+					left = tf.random.uniform((), window_left_min, window_left_max, dtype=tf.int32)
+					top = tf.random.uniform((), window_top_min, window_top_max, dtype=tf.int32)
+					right = left + perturb_W
+					bottom = top + perturb_H
 					pads = tf.stack([tf.stack([left, W-right]),tf.stack([top, W-bottom]),[0,0]])
 					return tf.pad(pert, pads)
 
