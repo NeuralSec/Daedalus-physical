@@ -247,17 +247,11 @@ class Daedalus:
 			Return:
 				# a transformed perturbation
 			"""
-			def zoom_pert(pert):
-				# zoom perturbation to fit the 416x416 input scale
-				return(tf.image.resize_images(images=pert,
-											  size=[pert_shape[0]*zoom_ratio[0],pert_shape[1]*zoom_ratio[1]],
-											  name='zooming'))
-
-			def scale(pert, img):
+			def zooming(pert, img):
 				'''
 				Scale masks
 				'''
-				with tf.name_scope('scale'):
+				with tf.name_scope('zooming'):
 					W = tf.cast(tf.shape(img)[-2], tf.float32)
 					perturb_size = tf.cast(tf.shape(pert)[-2], tf.float32)
 					newscale = tf.random.uniform((), tf.minimum(0.8*perturb_size, W), tf.minimum(1.2*perturb_size, W))
@@ -274,7 +268,13 @@ class Daedalus:
 
 			def apply_noise(pert):
 				return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
-				
+			
+			def scale_pert(pert):
+				# zoom perturbation to fit the 416x416 input scale
+				return(tf.image.resize_images(images=pert,
+											  size=[pert_shape[0]*zoom_ratio[0],pert_shape[1]*zoom_ratio[1]],
+											  name='scale'))
+
 			def pad_n_shift(pert, img):
 				'''
 				Shift and pad perturbation into img size
@@ -294,8 +294,7 @@ class Daedalus:
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
-				pert = zoom_pert(pert)
-				transformed_pert = apply_noise(rotates(scale(pert, img)))
+				transformed_pert = scale_pert(apply_noise(rotates(zooming(pert, img))))
 				return pad_n_shift(transformed_pert, img)
 
 		def NPS(imgs):
