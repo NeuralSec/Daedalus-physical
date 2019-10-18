@@ -40,7 +40,7 @@ ABORT_EARLY = True          		# if we stop improving, abort gradient descent ear
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
 PERT_SHAPE = (720, 480, 3)			# Perturbation shape in the real world
-ZOOM_RATIO = (int(416/1280), int(720/416))	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
+ZOOM_RATIO = (int(416/720), int(416/1280))	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
 
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
