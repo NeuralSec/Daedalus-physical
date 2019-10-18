@@ -39,7 +39,7 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (720, 480, 3)			# Perturbation shape in the real world
+PERT_SHAPE = (600, 400, 3)			# Perturbation shape in the real world
 ZOOM_RATIO = (int(416/720), int(416/1280))	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
 
 SAVE_PATH = 'physical_examples/'
@@ -262,7 +262,7 @@ class Daedalus:
 				'''
 				Rotate masks
 				'''
-				with tf.name_scope('rotate'):
+				with tf.name_scope('rotating'):
 					angles = np.pi * tf.random.uniform((), -0.1, 0.1)
 					return tf.contrib.image.rotate(pert, angles, name='rotated_imgs')
 
@@ -271,9 +271,11 @@ class Daedalus:
 			
 			def scale_pert(pert):
 				# zoom perturbation to fit the 416x416 input scale
-				return(tf.image.resize_images(images=pert,
-											  size=[pert_shape[0]*zoom_ratio[0],pert_shape[1]*zoom_ratio[1]],
-											  name='scale'))
+				with tf.name_scope('scaling'):
+					pert_shape = tf.shape(pert)
+					return(tf.image.resize_images(images=pert,
+												  size=[pert_shape[0]*zoom_ratio[0], pert_shape[1]*zoom_ratio[1]],
+												  name='scale'))
 
 			def pad_n_shift(pert, img):
 				'''
