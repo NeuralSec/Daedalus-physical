@@ -270,8 +270,11 @@ class Daedalus:
 					W = tf.cast(tf.shape(img)[-2], tf.float32)
 					perturb_height = tf.cast(tf.shape(pert)[-3], tf.float32)
 					perturb_width = tf.cast(tf.shape(pert)[-2], tf.float32)
-					new_height = tf.random.uniform((), tf.minimum(0.2*perturb_height, H), tf.minimum(0.5*perturb_height, H))
-					new_width = tf.random.uniform((), tf.minimum(0.2*perturb_width, W), tf.minimum(0.5*perturb_width, W))
+					scaling_factor = tf.random.uniform((), 0.3, 0.5)
+					
+					new_height = tf.minimum(scaling_factor*perturb_height, H)
+					new_width = tf.minimum(scaling_factor*perturb_width, W)
+					
 					_to_height = tf.cast(new_height, tf.int32)
 					_to_width = tf.cast(new_width, tf.int32)
 					return tf.image.resize_images(pert, [_to_height, _to_width], name='zooming')
@@ -291,6 +294,7 @@ class Daedalus:
 					perturb_width = tf.shape(pert)[-2]
 					window_top_min = tf.cast((H-perturb_height)/10, tf.int32)
 					window_top_max = tf.cast((H-perturb_height)/5, tf.int32)
+					
 					window_left_min = tf.cast((W-perturb_width)/10, tf.int32)
 					window_left_max = tf.cast((W-perturb_width)/5, tf.int32)
 					
