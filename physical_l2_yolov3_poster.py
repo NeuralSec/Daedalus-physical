@@ -337,9 +337,11 @@ class Daedalus:
 			self.perturbation = tf.tanh(perturbation)* self.boxmul + self.boxplus
 			duplicated_perts = tf.stack([self.perturbation]*batch_size)
 			transformed_pertbations = tf.map_fn(transform_perturbation, (duplicated_perts, self.timgs), dtype=tf.float32)
-			
 			self.newimgs = tf.where(tf.equal(transformed_pertbations, 0), tf.tanh(self.timgs)*self.boxmul+self.boxplus, transformed_pertbations)
 
+			print('transformed_pertbations', transformed_pertbations)
+			print('newimgs', self.newimgs)
+			
 			# Get prediction from the model:
 			outs = self.yolo_model._yolo(self.newimgs)
 			# [(N, 13, 13, 3, 85), (N, 26, 26, 3, 85), (N, 52, 52, 3, 85)]
