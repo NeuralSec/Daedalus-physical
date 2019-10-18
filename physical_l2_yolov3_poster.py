@@ -247,6 +247,11 @@ class Daedalus:
 			Return:
 				# a transformed perturbation
 			"""
+
+			def apply_noise(pert):
+				# Apply noise to the perturbation
+				return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
+
 			def scale_pert(pert):
 				# scale the hight-width ratio the perturbation to the 416x416 input
 				with tf.name_scope('scale'):
@@ -275,10 +280,6 @@ class Daedalus:
 				with tf.name_scope('rotate'):
 					angles = np.pi * tf.random.uniform((), -0.1, 0.1)
 					return tf.contrib.image.rotate(pert, angles, name='rotating')
-
-			def apply_noise(pert):
-				# Apply noise to the perturbation
-				return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
 				
 			def pad_n_shift(pert, img):
 				# Shift and pad the perturbation into img size
@@ -304,8 +305,8 @@ class Daedalus:
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
-				pert = scale_pert(pert)
-				transformed_pert = apply_noise(rotates(scale(pert, img)))
+				pert = scale_pert(apply_noise(pert))
+				transformed_pert = rotates(zoom(pert, img))
 				return pad_n_shift(transformed_pert, img)
 
 		def NPS(imgs):
