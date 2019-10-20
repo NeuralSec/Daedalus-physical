@@ -314,9 +314,11 @@ class Daedalus:
 				transformed_pert = rotates(zoom(pert, img))
 				return pad_n_shift(transformed_pert, img)
 
-		def NPS(imgs):
-			imgs * tf.transpose(imgs)
-			return
+		def NPS(img):
+			img = tf.reshape(img, (-1, 1))
+			diff_mat = img - tf.transpose(img)
+			print(diff_mat)
+			return tf.reduce_sum(tf.reduce_prod(diff_mat, axis=-1)) 
 
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
@@ -371,13 +373,15 @@ class Daedalus:
 			self.boxconf_losses = tf.reduce_mean(tf.square(self.box_scores - 1), [-3, -2, -1])
 			print('self.boxconf_losses', self.boxconf_losses)
 			# Minimising the size of all bounding box.
-			#self.f1 = tf.reduce_mean(IoU_expts)
 			self.f3 = tf.reduce_mean(tf.square(tf.multiply(self.bw, self.bh)), [-3, -2, -1])
 			print('self.f3', self.f3)
+			# NPS score of printers
+			self.nps_score = NPS(self.perturbation)
+			print(self.nps_score)
 
-			# add two loss terms together
+			# add loss terms together
 			self.adv_losses = self.boxconf_losses + self.f3
-			self.reduced_loss =  tf.reduce_mean(self.adv_losses)
+			self.reduced_loss =  tf.reduce_mean(self.adv_losses) + self.nps_score
 		
 		# Setup the adam optimizer and keep track of variables we're creating
 		start_vars = set(x.name for x in tf.global_variables())
