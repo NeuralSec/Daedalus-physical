@@ -315,6 +315,7 @@ class Daedalus:
 				return pad_n_shift(transformed_pert, img)
 
 		def NPS(imgs):
+			imgs * tf.transpose(imgs)
 			return
 
 		# the perturbation we're going to optimize:
@@ -338,8 +339,8 @@ class Daedalus:
 			# boxmin to boxmax:
 			self.boxmul = (boxmax - boxmin) / 2.
 			self.boxplus = (boxmin + boxmax) / 2.
-			self.perturbation = tf.tanh(perturbation)* self.boxmul + self.boxplus
-			duplicated_perts = tf.stack([self.perturbation]*batch_size)
+			self.perturbation = tf.tanh(perturbation) * self.boxmul + self.boxplus
+			duplicated_perts = tf.stack([self.perturbation] * batch_size)
 			transformed_pertbations = tf.map_fn(transform_perturbation, (duplicated_perts, self.timgs), dtype=tf.float32)
 			print('transformed_pertbations', transformed_pertbations)
 
