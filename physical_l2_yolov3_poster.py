@@ -29,8 +29,8 @@ import time
 from tqdm import tqdm
 
 # Parameter settings:
-GPU_ID = 0							# which gpu to used
-CONFIDENCE = 0.1					# the confidence of attack
+GPU_ID = 1							# which gpu to used
+CONFIDENCE = 0.3					# the confidence of attack
 EXAMPLE_NUM = 100					# total number of adversarial example to generate.
 BATCH_SIZE = 2						# number of adversarial example generated in each batch
 
@@ -270,7 +270,7 @@ class Daedalus:
 					W = tf.cast(tf.shape(img)[-2], tf.float32)
 					perturb_height = tf.cast(tf.shape(pert)[-3], tf.float32)
 					perturb_width = tf.cast(tf.shape(pert)[-2], tf.float32)
-					scaling_factor = tf.random.uniform((), 0.3, 0.5)
+					scaling_factor = tf.random.uniform((), 0.1, 0.3)
 					
 					new_height = tf.minimum(scaling_factor*perturb_height, H)
 					new_width = tf.minimum(scaling_factor*perturb_width, W)
@@ -314,11 +314,19 @@ class Daedalus:
 				transformed_pert = rotates(zoom(pert, img))
 				return pad_n_shift(transformed_pert, img)
 
-		def NPS(img):
+		def NPS(img, rate):
+			img_shape = tf.shape(img)
+			H, W, C = img_shape[-3], img_shape[-2], img_shape[-1]
 			img = tf.reshape(img, (-1, 1))
-			diff_mat = img - tf.transpose(img)
+			total_pixels = tf.cast(H, tf.float32)*tf.cast(W, tf.float32)*tf.cast(C, tf.float32)
+			sampled_pixel_num = tf.cast(total_pixels*rate, tf.int32)
+			down_sampled_img_inds = tf.random.uniform((sampled_pixel_num, 1), 0, tf.cast(total_pixels, tf.int32), dtype=tf.int32)
+			print('down_sampled_img_inds', down_sampled_img_inds)
+			
+			down_sampled_img = tf.gather_nd(img, down_sampled_img_inds)
+			diff_mat = down_sampled_img - tf.transpose(down_sampled_img)
 			print(diff_mat)
-			return tf.reduce_sum(tf.reduce_prod(diff_mat, axis=-1)) 
+			return tf.reduce_sum(tf.reduce_prod(diff_mat, axis=-1))
 
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
@@ -376,8 +384,8 @@ class Daedalus:
 			self.f3 = tf.reduce_mean(tf.square(tf.multiply(self.bw, self.bh)), [-3, -2, -1])
 			print('self.f3', self.f3)
 			# NPS score of printers
-			self.nps_score = NPS(self.perturbation)
-			print(self.nps_score)
+			self.nps_score = NPS(self.perturbation, 0.01)
+			print('self.nps_score', self.nps_score)
 
 			# add loss terms together
 			self.adv_losses = self.boxconf_losses + self.f3
@@ -409,16 +417,15 @@ class Daedalus:
 		batch_size = self.batch_size
 		# convert images to arctanh-space
 		imgs = np.arctanh((imgs - self.boxplus) / self.boxmul * 0.999999)
-		for batch_ind in range(int(imgs.shape[0]/batch_size)):
-			start = batch_size * batch_ind
-			end = start + batch_size
-			x_batch = imgs[start:end]
-
-			# set input images.
-			self.sess.run(self.setup, {self.assign_timgs: x_batch})
-			init_loss = sess.run(self.reduced_loss)
-			prev = init_loss * 1.2
-			for epoch in range(epochs):
+		for epoch in range(epochs):
+			for batch_ind in range(int(imgs.shape[0]/batch_size)):
+				start = batch_size * batch_ind
+				end = start + batch_size
+				x_batch = imgs[start:end]
+				# set input images.
+				self.sess.run(self.setup, {self.assign_timgs: x_batch})
+				init_loss = sess.run(self.reduced_loss)
+				prev = init_loss * 1.2
 				for iteration in range(self.MAX_ITERATIONS):
 					# perform the attack on a single example
 					_, l, distortion, l1s, nimgs, pertb_tanh = self.sess.run([self.train, self.reduced_loss, self.l2dist, self.adv_losses, self.newimgs, self.perturbation])
@@ -429,15 +436,15 @@ class Daedalus:
 						print('\nThe loss values of box confidence and dimension are:', sess.run([self.boxconf_losses, self.f3]))
 						print('\nThe adversarial losses for each example are:', l1s)
 						print('\nThe distortions of the perturbation is:', distortion)
-						io.imsave(f'debug/epoch{epoch}-iter{iteration}-cw tanh perturbation.png', pertb_tanh)
-						[io.imsave(f'debug/epoch{epoch}-iter{iteration}-cw example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
+						io.imsave(f'debug_with_nps/epoch{epoch}-iter{iteration}-cw tanh perturbation.png', pertb_tanh)
+						[io.imsave(f'debug_with_nps/epoch{epoch}-iter{iteration}-cw example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
 					# check if we should abort search if we're getting nowhere.
 					if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
 						if l > prev * .9999:
 							break
 						prev = l
-				if check_success(l, init_loss):
-					break
+					if check_success(l, init_loss):
+						break
 		return pertb_tanh, nimgs
 
 if __name__ == '__main__':
@@ -452,11 +459,11 @@ if __name__ == '__main__':
 	path = SAVE_PATH+'{0} confidence'.format(CONFIDENCE)
 	if not os.path.exists(path):
 		os.makedirs(path)
-	#try:
-	perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=20)
-	io.imsave(path+'/cw perturbation tanh.png', perturbation_tanh)
-	np.save(path+'/cw_images.npy', perturbed_images)
-	#except:
-	#	print('Perturbation not found.')
+	try:
+		perturbation_tanh, perturbed_images = attacker.attack(X_test, epochs=10)
+		io.imsave(path+'/cw perturbation tanh.png', perturbation_tanh)
+		np.save(path+'/cw_images.npy', perturbed_images)
+	except:
+		print('Perturbation not found.')
 	writer = tf.summary.FileWriter("log", sess.graph)
 	writer.close()
