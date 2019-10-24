@@ -29,9 +29,8 @@ import time
 from tqdm import tqdm
 
 # Parameter settings:
-GPU_ID = 1							# which gpu to used
-CONFIDENCE = 0.3					# the confidence of attack
-EXAMPLE_NUM = 100					# total number of adversarial example to generate.
+GPU_ID = 0							# which gpu to used
+CONFIDENCE = 0.5					# the confidence of attack
 BATCH_SIZE = 2						# number of adversarial example generated in each batch
 
 CLASS_NUM = 80						# 80 for COCO dataset
@@ -253,8 +252,8 @@ class Daedalus:
 				with tf.name_scope('apply_noise'):
 					return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
 
-			def scale_pert(pert):
-				# scale the hight-width ratio the perturbation to the 416x416 input
+			def scale(pert):
+				# scale the hight-width ratio of the perturbation to the 416x416 input
 				with tf.name_scope('scale'):
 					perturb_height = tf.cast(tf.shape(pert)[-3], tf.float32)
 					perturb_width = tf.cast(tf.shape(pert)[-2], tf.float32)
@@ -270,7 +269,7 @@ class Daedalus:
 					W = tf.cast(tf.shape(img)[-2], tf.float32)
 					perturb_height = tf.cast(tf.shape(pert)[-3], tf.float32)
 					perturb_width = tf.cast(tf.shape(pert)[-2], tf.float32)
-					scaling_factor = tf.random.uniform((), 0.1, 0.3)
+					scaling_factor = tf.random.uniform((), 0.2, 0.7)
 					
 					new_height = tf.minimum(scaling_factor*perturb_height, H)
 					new_width = tf.minimum(scaling_factor*perturb_width, W)
@@ -279,7 +278,7 @@ class Daedalus:
 					_to_width = tf.cast(new_width, tf.int32)
 					return tf.image.resize_images(pert, [_to_height, _to_width], name='zooming')
 
-			def rotates(pert):
+			def rotate(pert):
 				# Rotate the perturbation
 				with tf.name_scope('rotate'):
 					angles = np.pi * tf.random.uniform((), -0.1, 0.1)
@@ -292,11 +291,11 @@ class Daedalus:
 					W = tf.shape(img)[-2]
 					perturb_height = tf.shape(pert)[-3]
 					perturb_width = tf.shape(pert)[-2]
-					window_top_min = tf.cast((H-perturb_height)/10, tf.int32)
-					window_top_max = tf.cast((H-perturb_height)/5, tf.int32)
+					window_top_min = 0
+					window_top_max = tf.cast((H-perturb_height), tf.int32)
 					
-					window_left_min = tf.cast((W-perturb_width)/10, tf.int32)
-					window_left_max = tf.cast((W-perturb_width)/5, tf.int32)
+					window_left_min = 0
+					window_left_max = tf.cast((W-perturb_width), tf.int32)
 					
 					# set positions of the perturbation according to a uniform distribution
 					top = tf.random.uniform((), window_top_min, window_top_max, dtype=tf.int32)
@@ -310,8 +309,8 @@ class Daedalus:
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
-				pert = scale_pert(apply_noise(pert))
-				transformed_pert = rotates(zoom(pert, img))
+				pert = scale(apply_noise(pert))
+				transformed_pert = rotate(zoom(pert, img))
 				return pad_n_shift(transformed_pert, img)
 
 		def NPS(img, rate):
@@ -436,8 +435,8 @@ class Daedalus:
 						print('\nThe loss values of box confidence and dimension are:', sess.run([self.boxconf_losses, self.f3]))
 						print('\nThe adversarial losses for each example are:', l1s)
 						print('\nThe distortions of the perturbation is:', distortion)
-						io.imsave(f'debug_with_nps/epoch{epoch}-iter{iteration}-cw tanh perturbation.png', pertb_tanh)
-						[io.imsave(f'debug_with_nps/epoch{epoch}-iter{iteration}-cw example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
+						io.imsave(f'debug_with_nps_2/epoch{epoch}-iter{iteration}-cw tanh perturbation.png', pertb_tanh)
+						[io.imsave(f'debug_with_nps_2/epoch{epoch}-iter{iteration}-cw example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
 					# check if we should abort search if we're getting nowhere.
 					if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
 						if l > prev * .9999:
