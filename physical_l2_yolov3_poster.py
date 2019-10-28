@@ -38,8 +38,8 @@ MAX_ITERATIONS = 10000      		# number of iterations to perform gradient descent
 ABORT_EARLY = True          		# if we stop improving, abort gradient descent early
 LEARNING_RATE = 1e-2        		# larger values converge faster to less accurate results
 IMAGE_SHAPE = (416, 416, 3)         # input image shape
-PERT_SHAPE = (720, 720, 3)			# Perturbation shape in the real world
-ZOOM_RATIO = (416/720, 416/1280)	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
+PERT_SHAPE = (1280, 1280, 3)		# Perturbation shape in the real world
+ASPECT_RATIO = (416/720, 416/1280)	# Ratio for zooming perturbation as yolo inputs. Resolution of cameras for yolov3 (iphone 7, 720P)
 
 SAVE_PATH = 'physical_examples/'
 # select GPU to use
@@ -227,7 +227,7 @@ class Daedalus:
 	"""
 	Daedalus adversarial example generator based on the Yolo v3 model.
 	"""
-	def __init__(self, sess, model, pert_shape=PERT_SHAPE, img_shape=IMAGE_SHAPE, zoom_ratio=ZOOM_RATIO, batch_size=BATCH_SIZE, confidence=CONFIDENCE,
+	def __init__(self, sess, model, pert_shape=PERT_SHAPE, img_shape=IMAGE_SHAPE, aspect_ratio=ASPECT_RATIO, batch_size=BATCH_SIZE, confidence=CONFIDENCE,
 				 learning_rate=LEARNING_RATE, max_iterations=MAX_ITERATIONS, abort_early=ABORT_EARLY, boxmin=0, boxmax=1):
 		self.sess = sess
 		self.LEARNING_RATE = learning_rate
@@ -252,7 +252,7 @@ class Daedalus:
 				with tf.name_scope('apply_noise'):
 					return tf.clip_by_value(pert + 0.01*tf.random.normal(tf.shape(pert)), 0, 1)
 
-			def scale(pert):
+			def scale(pert, zoom_ratio):
 				# scale the hight-width ratio of the perturbation to the 416x416 input
 				with tf.name_scope('scale'):
 					perturb_height = tf.cast(tf.shape(pert)[-3], tf.float32)
@@ -260,7 +260,7 @@ class Daedalus:
 					# height = 416, width = 234
 					_to_height = tf.cast(perturb_height*zoom_ratio[0], tf.int32)
 					_to_width = tf.cast(perturb_width*zoom_ratio[1], tf.int32)
-					return(tf.image.resize_images(images=pert, size=[_to_height, _to_width], name='scaling'))
+					return(tf.image.resize_images(pert, size=[_to_height, _to_width], name='scaling'))
 
 			def zoom(pert, img):
 				# Zoom the perturbation
@@ -271,12 +271,13 @@ class Daedalus:
 					perturb_width = tf.cast(tf.shape(pert)[-2], tf.float32)
 					scaling_factor = tf.random.uniform((), 0.2, 0.7)
 					
-					new_height = tf.minimum(scaling_factor*perturb_height, H)
-					new_width = tf.minimum(scaling_factor*perturb_width, W)
-					
+					pert_to_img_ratio = tf.maximum(perturb_height/H, perturb_width/W)
+					new_height = scaling_factor*(perturb_height/pert_to_img_ratio)
+					new_width = scaling_factor*(perturb_width/pert_to_img_ratio)
+
 					_to_height = tf.cast(new_height, tf.int32)
 					_to_width = tf.cast(new_width, tf.int32)
-					return tf.image.resize_images(pert, [_to_height, _to_width], name='zooming')
+					return tf.image.resize_images(pert, size=[_to_height, _to_width], name='zooming')
 
 			def rotate(pert):
 				# Rotate the perturbation
@@ -309,7 +310,7 @@ class Daedalus:
 
 			with tf.name_scope('generate_mask'):
 				(pert,img) = pert_img
-				pert = scale(apply_noise(pert))
+				pert = scale(apply_noise(pert), aspect_ratio)
 				transformed_pert = rotate(zoom(pert, img))
 				return pad_n_shift(transformed_pert, img)
 
@@ -330,8 +331,8 @@ class Daedalus:
 		# the perturbation we're going to optimize:
 		with tf.name_scope('inputs'):
 			perturbation = tf.Variable(np.zeros((pert_shape[0],
-									       	     pert_shape[1],
-									       	     pert_shape[2])), dtype=tf.float32, name='perturbation')
+												 pert_shape[1],
+												 pert_shape[2])), dtype=tf.float32, name='perturbation')
 
 			# tf variables to sending data to tf:
 			self.timgs = tf.Variable(np.zeros((batch_size,
@@ -383,7 +384,7 @@ class Daedalus:
 			self.f3 = tf.reduce_mean(tf.square(tf.multiply(self.bw, self.bh)), [-3, -2, -1])
 			print('self.f3', self.f3)
 			# NPS score of printers
-			self.nps_score = NPS(self.perturbation, 0.01)
+			self.nps_score = NPS(self.perturbation, 0.001)
 			print('self.nps_score', self.nps_score)
 
 			# add loss terms together
@@ -435,8 +436,8 @@ class Daedalus:
 						print('\nThe loss values of box confidence and dimension are:', sess.run([self.boxconf_losses, self.f3]))
 						print('\nThe adversarial losses for each example are:', l1s)
 						print('\nThe distortions of the perturbation is:', distortion)
-						io.imsave(f'debug_with_nps_2/epoch{epoch}-iter{iteration}-cw tanh perturbation.png', pertb_tanh)
-						[io.imsave(f'debug_with_nps_2/epoch{epoch}-iter{iteration}-cw example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
+						io.imsave(f'debug_with_nps/epoch{epoch}-iter{iteration}-cw tanh perturbation.png', pertb_tanh)
+						[io.imsave(f'debug_with_nps/epoch{epoch}-iter{iteration}-cw example {i}.png', nimgs[i]) for i in range(nimgs.shape[0])]
 					# check if we should abort search if we're getting nowhere.
 					if self.ABORT_EARLY and iteration % (self.MAX_ITERATIONS // 10) == 0:
 						if l > prev * .9999:
